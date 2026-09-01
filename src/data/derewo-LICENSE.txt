@@ -1,0 +1,19 @@
+Herkunft: DeReWo-Wortformenliste, Institut für Deutsche Sprache (IDS) Mannheim.
+
+Verwendet wird hier die Wortformenliste (Wortform + Grammatik-Tag je Zeile),
+nicht die frequenzsortierte Grundformenliste. Siehe den Kommentarkopf von
+scripts/derewo-aufbereiten.ts für die daraus folgende Einschränkung
+(kein Häufigkeitsrang, daher reines Bekanntheits-Wörterbuch statt
+Top-5.000/20.000-Abstufung).
+
+Lizenz: CC BY-NC (nicht-kommerzielle Nutzung). Das Repository, in dem
+derewo-top20k.json liegt, bleibt privat; eine Weitergabe der Liste selbst
+(auch der aufbereiteten Fassung) ist damit nicht vorgesehen. Sollte das
+Repository je öffentlich werden, muss diese Datei vorher entfernt bzw.
+durch eine selbst erstellte Liste ersetzt werden (siehe Konzept,
+Abschnitt 3.5 und 8).
+
+Die Rohdatei selbst (scripts/derewo-quelle/wortformliste.csv) ist nicht
+Teil dieses Repositories (siehe .gitignore) und muss bei Bedarf erneut
+lokal bereitgestellt werden, um scripts/derewo-aufbereiten.ts erneut
+auszuführen.
