@@ -20,6 +20,7 @@
 import { RangeSetBuilder, StateEffect, StateField, type Extension } from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import type { Befund, Kategorie } from "../analyse/types";
+import { KATEGORIE_META } from "./kategorien";
 
 export const ALLE_KATEGORIEN: Kategorie[] = [
 	"langer-satz",
@@ -56,10 +57,15 @@ export function baueDecorations(
 		.sort((a, b) => a.von - b.von || a.bis - b.bis);
 
 	for (const b of gefiltert) {
+		const meta = KATEGORIE_META[b.kategorie];
+		const titel = b.hinweis ? `${meta.label}: ${b.hinweis}` : `${meta.label} — ${meta.kurzerklaerung}`;
 		builder.add(
 			b.von,
 			b.bis,
-			Decoration.mark({ class: `textanalyse-mark textanalyse-mark-${b.kategorie}` })
+			Decoration.mark({
+				class: `textanalyse-mark textanalyse-mark-${b.kategorie}`,
+				attributes: { title: titel },
+			})
 		);
 	}
 
