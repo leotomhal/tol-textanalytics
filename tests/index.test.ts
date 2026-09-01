@@ -99,4 +99,43 @@ describe("analysiere (Fundament M1 + Kennzahlen M2)", () => {
 		expect(fachbegriffe?.wert).toBeGreaterThan(0);
 		expect(schulstufe?.nebenwert).toBeDefined();
 	});
+
+	describe("Cursor-Satz-Ausschluss (Konzept 2.2)", () => {
+		it("nimmt den Satz unter dem Cursor aus Satzlängen und Kennzahlen aus", () => {
+			const fertig = "Ein fertiger Satz mit genug Wörtern für die Analyse.";
+			const unfertig = " Und hier tippt gerade noch j";
+			const text = fertig + unfertig;
+			const cursorOffset = text.length; // Cursor am Ende, mitten im unfertigen Satz.
+
+			const ohneCursor = analysiere(text);
+			const mitCursor = analysiere(text, { cursorOffset });
+
+			expect(ohneCursor.aktuellerSatzAusgenommen).toBe(false);
+			expect(mitCursor.aktuellerSatzAusgenommen).toBe(true);
+			expect(mitCursor.satzlaengen.length).toBeLessThan(ohneCursor.satzlaengen.length);
+			expect(mitCursor.woerter.some((w) => w.text === "tippt")).toBe(false);
+		});
+
+		it("lässt fertige Sätze vor dem Cursor unangetastet", () => {
+			const text = "Erster fertiger Satz. Zweiter fertiger Satz. Und hier tippt jemand w";
+			const cursorOffset = text.length;
+			const ergebnis = analysiere(text, { cursorOffset });
+			expect(ergebnis.woerter.some((w) => w.text === "Erster")).toBe(true);
+			expect(ergebnis.woerter.some((w) => w.text === "Zweiter")).toBe(true);
+			expect(ergebnis.woerter.some((w) => w.text === "tippt")).toBe(false);
+		});
+
+		it("setzt aktuellerSatzAusgenommen nicht, wenn der Cursor außerhalb aller Sätze liegt (z. B. in einer Leerzeile)", () => {
+			const text = "Ein Satz.\n\n";
+			const ergebnis = analysiere(text, { cursorOffset: text.length });
+			expect(ergebnis.aktuellerSatzAusgenommen).toBe(false);
+		});
+
+		it("erhöht woerterMaskiert um die Wörter des ausgenommenen Satzes", () => {
+			const text = "Ein fertiger Satz. Und hier tippt jemand noch w";
+			const ohneCursor = analysiere(text);
+			const mitCursor = analysiere(text, { cursorOffset: text.length });
+			expect(mitCursor.woerterMaskiert).toBeGreaterThan(ohneCursor.woerterMaskiert);
+		});
+	});
 });

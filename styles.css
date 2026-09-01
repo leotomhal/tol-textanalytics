@@ -1,1 +1,85 @@
-/* Wird in späteren Milestones befüllt (Markierungsfarben, Panel-Layout). */
+.textanalyse-panel {
+	padding: 8px 12px;
+	font-size: var(--font-ui-small);
+}
+
+.textanalyse-hinweis {
+	color: var(--text-muted);
+	padding: 8px 0;
+}
+
+.textanalyse-hinweis-dezent {
+	font-size: var(--font-ui-smaller);
+	padding: 2px 0;
+}
+
+.textanalyse-wortzahl {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	margin-bottom: 8px;
+}
+
+.textanalyse-auswahl-hinweis {
+	font-weight: var(--font-medium);
+	margin-bottom: 8px;
+}
+
+.textanalyse-kennzahlen {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-bottom: 12px;
+}
+
+.textanalyse-kennzahl {
+	border-left: 3px solid var(--background-modifier-border);
+	padding: 4px 8px;
+	border-radius: var(--radius-s);
+}
+
+.textanalyse-status-gruen {
+	border-left-color: var(--text-success);
+}
+.textanalyse-status-gelb {
+	border-left-color: var(--text-warning);
+}
+.textanalyse-status-rot {
+	border-left-color: var(--text-error);
+}
+
+.textanalyse-kennzahl-kopf {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.textanalyse-kennzahl-label {
+	color: var(--text-muted);
+}
+
+.textanalyse-kennzahl-wert {
+	font-weight: var(--font-medium);
+}
+
+.textanalyse-kennzahl-neben {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.textanalyse-checkliste {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	border-top: 1px solid var(--background-modifier-border);
+	padding-top: 8px;
+}
+
+.textanalyse-checkliste-zeile {
+	display: flex;
+	justify-content: space-between;
+	padding: 2px 4px;
+}
+
+.textanalyse-checkliste-anzahl {
+	color: var(--text-muted);
+}

@@ -2,12 +2,12 @@
  * Analysekern. Importiert bewusst nichts aus "obsidian" (siehe Konzept 2.1),
  * damit dieser Ordner isoliert mit Vitest testbar bleibt.
  *
- * Stand M3: Fundament (M1) plus Lesbarkeits- und Rhythmus-Kennzahlen (M2)
- * plus Stilmarker (Füllwörter, Perfekt, Nominalstil, Streckverben — ohne
- * Passiv, das kommt mit M6). `status` und `ziel` jeder Kennzahl bleiben bis
- * M7 neutral/undefined — die Zielprofile aus Konzept 4.3 existieren noch
- * nicht. Wort-Fundstellen für "seltenes-wort" (Markierung im Editor)
- * kommen mit M5.
+ * Stand M4: Fundament (M1), Lesbarkeits-/Rhythmus-Kennzahlen (M2),
+ * Stilmarker (M3) plus Cursor-Satz-Ausschluss (Konzept 2.2, `cursorOffset`
+ * in AnalyseOptionen) für die Obsidian-Integration. `status`/`ziel` jeder
+ * Kennzahl bleiben bis M7 neutral/undefined — die Zielprofile aus Konzept
+ * 4.3 existieren noch nicht. Wort-Fundstellen für "seltenes-wort"
+ * (Markierung im Editor) kommen mit M5.
  */
 
 import { maskiere } from "./vorbereitung";
@@ -65,6 +65,14 @@ export interface AnalyseOptionen {
 	 * übergeben, damit `analysiere()` selbst synchron bleiben kann.
 	 */
 	frequenzquelle?: Frequenzquelle;
+	/**
+	 * Zeichenoffset der Cursorposition im Rohtext (Konzept 2.2). Wenn
+	 * gesetzt und ein Satz gefunden wird, der diese Position enthält, wird
+	 * genau dieser Satz vor der Auswertung aus der Satzliste entfernt —
+	 * er ist beim Tippen fast immer unfertig und würde sonst als
+	 * `sehr-langer-satz`/`seltenes-wort` falsch auffallen.
+	 */
+	cursorOffset?: number;
 }
 
 function zeileAusZeichenoffset(rohtext: string, offset: number): number {
@@ -79,7 +87,19 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 	const start = performance.now();
 
 	const maskierung = maskiere(rohtext, optionen.schlussteilAusloeser ?? []);
-	const saetze = segmentiereSaetze(maskierung.maskiert);
+	const alleSaetze = segmentiereSaetze(maskierung.maskiert);
+
+	let saetze = alleSaetze;
+	let aktuellerSatzAusgenommen = false;
+	if (optionen.cursorOffset !== undefined) {
+		const cursor = optionen.cursorOffset;
+		const index = alleSaetze.findIndex((s) => cursor >= s.von && cursor <= s.bis);
+		if (index !== -1) {
+			saetze = alleSaetze.filter((_, i) => i !== index);
+			aktuellerSatzAusgenommen = true;
+		}
+	}
+
 	const woerterAnalysiert = saetze.flatMap((s) => s.woerter);
 	const woerterGesamt = tokenisiereWoerter(rohtext).length;
 	const satzlaengen = saetze.map((s) => s.woerter.length);
@@ -228,9 +248,11 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 		istDeutsch: sprachpruefung.istDeutsch,
 		kennzahlen,
 		befunde,
+		woerter: woerterAnalysiert,
 		satzlaengen,
 		woerterGesamt,
 		woerterMaskiert: Math.max(woerterGesamt - woerterAnalysiert.length, 0),
+		aktuellerSatzAusgenommen,
 		schlussteilAbZeile:
 			maskierung.schlussteilAbZeichen !== undefined
 				? zeileAusZeichenoffset(rohtext, maskierung.schlussteilAbZeichen)
