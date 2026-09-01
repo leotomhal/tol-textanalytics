@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { analysiere } from "../src/analyse/index";
 import { ladeDerewoFrequenzquelle } from "../src/analyse/wortschatz";
+import { STANDARD_PROFILE, profilListeZuRecord } from "../src/settings/profiles";
 
 describe("analysiere (Fundament M1 + Kennzahlen M2)", () => {
 	it("liefert ein vollständiges Ergebnis-Objekt für einen einfachen deutschen Text", () => {
@@ -152,6 +153,71 @@ describe("analysiere (Fundament M1 + Kennzahlen M2)", () => {
 			const ohneCursor = analysiere(text);
 			const mitCursor = analysiere(text, { cursorOffset: text.length });
 			expect(mitCursor.woerterMaskiert).toBeGreaterThan(ohneCursor.woerterMaskiert);
+		});
+	});
+
+	describe("Zielprofile (Konzept 4.3, M7)", () => {
+		const profile = profilListeZuRecord(STANDARD_PROFILE);
+		const pressemitteilung = profile.pressemitteilung;
+
+		it("bleibt ohne übergebenes Profil bei status neutral (rückwärtskompatibel zu M2-M6)", () => {
+			const ergebnis = analysiere("Der Hund läuft. Die Katze schläft. Der Vogel singt.");
+			for (const k of ergebnis.kennzahlen) {
+				expect(k.status).toBe("neutral");
+			}
+		});
+
+		it("bewertet die profilgebundenen Kennzahlen gegen ein übergebenes Profil", () => {
+			const text = "Der Hund läuft. Die Katze schläft. Der Vogel singt.";
+			const ergebnis = analysiere(text, { profil: pressemitteilung });
+			const schulstufe = ergebnis.kennzahlen.find((k) => k.id === "schulstufe");
+			expect(schulstufe?.status).not.toBe("neutral");
+			expect(schulstufe?.ziel).toContain("Pressemitteilung");
+		});
+
+		it("Profil 'Frei' liefert weiterhin status neutral (keine Schwellen, nur Zahlen)", () => {
+			const text = "Der Hund läuft. Die Katze schläft. Der Vogel singt.";
+			const ergebnis = analysiere(text, { profil: profile.frei });
+			for (const k of ergebnis.kennzahlen) {
+				expect(k.status).toBe("neutral");
+			}
+		});
+
+		it("Frontmatter-Override (textanalyse-profil) übersteuert das übergebene Standardprofil", () => {
+			const text =
+				"---\ntextanalyse-profil: fachtext\n---\nDer Hund läuft. Die Katze schläft. Der Vogel singt.";
+			const ergebnis = analysiere(text, {
+				profil: pressemitteilung,
+				profilUeberschreibungen: profile,
+			});
+			const schulstufe = ergebnis.kennzahlen.find((k) => k.id === "schulstufe");
+			expect(schulstufe?.ziel).toContain("Fachtext");
+		});
+
+		it("ignoriert einen unbekannten Frontmatter-Override und bleibt beim übergebenen Standardprofil", () => {
+			const text =
+				"---\ntextanalyse-profil: nicht-vorhanden\n---\nDer Hund läuft. Die Katze schläft. Der Vogel singt.";
+			const ergebnis = analysiere(text, {
+				profil: pressemitteilung,
+				profilUeberschreibungen: profile,
+			});
+			const schulstufe = ergebnis.kennzahlen.find((k) => k.id === "schulstufe");
+			expect(schulstufe?.ziel).toContain("Pressemitteilung");
+		});
+
+		it("gibt vorherigeStatus je Kennzahl-ID an bewerte() weiter (Verschlechterung wirkt End-to-End sofort)", () => {
+			// Dichter, fachwortlastiger Text -> hohe Schulstufe, klar "rot"
+			// gegen das Pressemitteilungs-Ziel (≤ 11). Eine Verschlechterung
+			// greift ohne Hysterese sofort (siehe bewertung.test.ts für den
+			// gedämpften Verbesserungsfall im Detail).
+			const text =
+				"Die Interdependenztheorie beschreibt komplexe Wechselwirkungsstrukturen zwischen heterogenen Organisationseinheiten und deren Kommunikationsbeziehungen.";
+			const ergebnis = analysiere(text, {
+				profil: pressemitteilung,
+				vorherigeStatus: { schulstufe: "gruen" },
+			});
+			const schulstufe = ergebnis.kennzahlen.find((k) => k.id === "schulstufe");
+			expect(schulstufe?.status).toBe("rot");
 		});
 	});
 });

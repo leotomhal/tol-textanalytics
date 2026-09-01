@@ -8,10 +8,12 @@ import {
 	mitKompositazerlegung,
 } from "./analyse/wortschatz";
 import type { Frequenzquelle } from "./analyse/wortschatz";
-import type { Befund, Ergebnis, Kategorie } from "./analyse/types";
+import type { Befund, Ergebnis, Kategorie, KennzahlStatus, Profil } from "./analyse/types";
 import { AnalyseView, ANALYSE_VIEW_TYPE } from "./view/AnalyseView";
 import { debounce } from "./view/debounce";
 import { ALLE_KATEGORIEN, setzeBefunde, setzeSichtbarkeit, textanalyseDecorationsExtension } from "./view/decorations";
+import { TextanalyseSettingTab } from "./settings/Settings";
+import { STANDARD_PROFILE, STANDARD_PROFIL_ID, profilListeZuRecord } from "./settings/profiles";
 
 /** Konzept 2.4: Panel aktualisiert nach 400 ms Tippruhe. */
 const PANEL_DEBOUNCE_MS = 400;
@@ -26,6 +28,12 @@ interface GespeicherteDaten {
 	ignorierteWoerter?: string[];
 	immerMarkierenWoerter?: string[];
 	sichtbareKategorien?: string[];
+	profile?: Profil[];
+	profilStandardId?: string;
+	fuellwoerterListe?: string[];
+	nominalstilAusnahmenListe?: string[];
+	streckverbenListe?: string[];
+	schlussteilAusloeser?: string[];
 }
 
 /**
@@ -52,11 +60,27 @@ export default class TextanalysePlugin extends Plugin {
 	private vorherigeSichtbareKategorien: Set<Kategorie> | null = null;
 	private letztesErgebnis: Ergebnis | null = null;
 
+	/**
+	 * Alles ab hier `public`, weil settings/Settings.ts direkt darauf
+	 * liest/schreibt (siehe Kommentar dort) — bewusst kein zusätzliches
+	 * Getter/Setter-Geflecht für einfache Listen-/Objektfelder.
+	 */
+	profile: Profil[] = [...STANDARD_PROFILE];
+	profilStandardId: string = STANDARD_PROFIL_ID;
+	fuellwoerterListe: string[] = [];
+	nominalstilAusnahmenListe: string[] = [];
+	streckverbenListe: string[] = [];
+	schlussteilAusloeser: string[] = [];
+
+	/** Hysterese (Konzept 2.4) — letzter angezeigter Status je Kennzahl-ID. */
+	private vorherigeStatus: Partial<Record<string, KennzahlStatus>> = {};
+
 	async onload(): Promise<void> {
 		await this.ladeGespeicherteDaten();
 
 		this.registerView(ANALYSE_VIEW_TYPE, (leaf) => new AnalyseView(leaf));
 		this.registerEditorExtension(textanalyseDecorationsExtension());
+		this.addSettingTab(new TextanalyseSettingTab(this.app, this));
 
 		this.addCommand({
 			id: "textanalyse-panel-oeffnen-schliessen",
@@ -108,7 +132,7 @@ export default class TextanalysePlugin extends Plugin {
 	}
 
 	onunload(): void {
-		// registerView/registerEvent/registerEditorExtension räumen sich über Component#unload selbst auf.
+		// registerView/registerEvent/registerEditorExtension/addSettingTab räumen sich über Component#unload selbst auf.
 	}
 
 	private async ladeGespeicherteDaten(): Promise<void> {
@@ -118,6 +142,19 @@ export default class TextanalysePlugin extends Plugin {
 		this.sichtbareKategorien = new Set(
 			(daten?.sichtbareKategorien as Kategorie[] | undefined) ?? ALLE_KATEGORIEN
 		);
+		this.profile = daten?.profile && daten.profile.length > 0 ? daten.profile : [...STANDARD_PROFILE];
+		this.profilStandardId = daten?.profilStandardId ?? STANDARD_PROFIL_ID;
+		this.fuellwoerterListe = daten?.fuellwoerterListe ?? [];
+		this.nominalstilAusnahmenListe = daten?.nominalstilAusnahmenListe ?? [];
+		this.streckverbenListe = daten?.streckverbenListe ?? [];
+		this.schlussteilAusloeser = daten?.schlussteilAusloeser ?? [];
+	}
+
+	/** Öffentlich, damit Settings.ts nach jeder Änderung speichern und neu analysieren lassen kann. */
+	async persistiereUndAktualisiere(): Promise<void> {
+		await this.persistiere();
+		this.aktualisiereAktiveNotiz({ erzwungen: false });
+		this.aktualisiereDecorations();
 	}
 
 	private async persistiere(): Promise<void> {
@@ -125,12 +162,41 @@ export default class TextanalysePlugin extends Plugin {
 			ignorierteWoerter: Array.from(this.ignorierteWoerter),
 			immerMarkierenWoerter: Array.from(this.immerMarkierenWoerter),
 			sichtbareKategorien: Array.from(this.sichtbareKategorien),
+			profile: this.profile,
+			profilStandardId: this.profilStandardId,
+			fuellwoerterListe: this.fuellwoerterListe,
+			nominalstilAusnahmenListe: this.nominalstilAusnahmenListe,
+			streckverbenListe: this.streckverbenListe,
+			schlussteilAusloeser: this.schlussteilAusloeser,
 		};
 		await this.saveData(daten);
 	}
 
 	private effektiveFrequenzquelle(): Frequenzquelle {
 		return mitUeberschreibungen(this.frequenzquelle, this.ignorierteWoerter, this.immerMarkierenWoerter);
+	}
+
+	/** Baut die AnalyseOptionen, die für jeden Analyselauf gleich sind (Panel wie Decorations). */
+	private analyseOptionen(cursorOffset: number) {
+		const profilRegister = profilListeZuRecord(this.profile);
+		return {
+			frequenzquelle: this.effektiveFrequenzquelle(),
+			cursorOffset,
+			schlussteilAusloeser: this.schlussteilAusloeser,
+			profil: profilRegister[this.profilStandardId],
+			profilUeberschreibungen: profilRegister,
+			vorherigeStatus: this.vorherigeStatus,
+			fuellwoerterListe: this.fuellwoerterListe.length > 0 ? this.fuellwoerterListe : undefined,
+			nominalstilAusnahmen:
+				this.nominalstilAusnahmenListe.length > 0
+					? new Set(this.nominalstilAusnahmenListe.map((w) => w.toLowerCase()))
+					: undefined,
+			streckverbenListe: this.streckverbenListe.length > 0 ? this.streckverbenListe : undefined,
+		};
+	}
+
+	private merkeStatus(ergebnis: Ergebnis): void {
+		for (const k of ergebnis.kennzahlen) this.vorherigeStatus[k.id] = k.status;
 	}
 
 	private async togglePanel(): Promise<void> {
@@ -180,11 +246,9 @@ export default class TextanalysePlugin extends Plugin {
 		}
 
 		const cursorOffset = editor.posToOffset(editor.getCursor());
-		const ergebnis = analysiere(text, {
-			frequenzquelle: this.effektiveFrequenzquelle(),
-			cursorOffset,
-		});
+		const ergebnis = analysiere(text, this.analyseOptionen(cursorOffset));
 		this.letztesErgebnis = ergebnis;
+		this.merkeStatus(ergebnis);
 
 		const auswahlText = editor.getSelection();
 		const auswahl =
@@ -219,11 +283,9 @@ export default class TextanalysePlugin extends Plugin {
 		if (this.istZuGrossFuerLiveAnalyse(text)) return; // keine Live-Markierungen für riesige Notizen.
 
 		const cursorOffset = editor.posToOffset(editor.getCursor());
-		const ergebnis = analysiere(text, {
-			frequenzquelle: this.effektiveFrequenzquelle(),
-			cursorOffset,
-		});
+		const ergebnis = analysiere(text, this.analyseOptionen(cursorOffset));
 		this.letztesErgebnis = ergebnis;
+		this.merkeStatus(ergebnis);
 
 		cm.dispatch({ effects: setzeBefunde.of(ergebnis.befunde) });
 	}
@@ -307,5 +369,19 @@ export default class TextanalysePlugin extends Plugin {
 		const bis = editor.offsetToPos(ziel.bis);
 		editor.setSelection(von, bis);
 		editor.scrollIntoView({ from: von, to: bis }, true);
+	}
+
+	/** Für Settings.ts: Ignorierliste als Zeilen lesen/schreiben (Konzept 3.5, "in den Settings einsehbar und editierbar"). */
+	getIgnorierteWoerterZeilen(): string {
+		return Array.from(this.ignorierteWoerter).sort().join("\n");
+	}
+	setIgnorierteWoerterZeilen(zeilen: string[]): void {
+		this.ignorierteWoerter = new Set(zeilen.map((w) => w.toLowerCase()));
+	}
+	getImmerMarkierenZeilen(): string {
+		return Array.from(this.immerMarkierenWoerter).sort().join("\n");
+	}
+	setImmerMarkierenZeilen(zeilen: string[]): void {
+		this.immerMarkierenWoerter = new Set(zeilen.map((w) => w.toLowerCase()));
 	}
 }

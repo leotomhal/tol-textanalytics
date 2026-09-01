@@ -21,6 +21,8 @@ export type Kategorie =
 
 export type Sicherheit = "hoch" | "mittel";
 
+export type KennzahlStatus = "gruen" | "gelb" | "rot" | "neutral";
+
 export interface Befund {
 	kategorie: Kategorie;
 	von: number;
@@ -37,10 +39,31 @@ export interface Kennzahl {
 	wert: number;
 	anzeige: string;
 	nebenwert?: string;
-	status: "gruen" | "gelb" | "rot" | "neutral";
+	status: KennzahlStatus;
 	ziel?: string;
 	sicherheit: Sicherheit;
 	tooltip: string;
+}
+
+/**
+ * Zielwertprofil (Konzept 4.3). Alle Zielwerte sind "≤"-Obergrenzen und
+ * optional — ein Profil ohne einen bestimmten Zielwert liefert für die
+ * zugehörige Kennzahl `status: "neutral"` (siehe Profil "Frei": "keine
+ * Schwellen, nur Zahlen"). Werte sind gesetzt, nicht gemessen (Konzept
+ * 4.3) — jedes Standardprofil und jedes selbst angelegte ist in den
+ * Settings direkt editierbar.
+ */
+export interface Profil {
+	id: string;
+	name: string;
+	zielSchulstufe?: number;
+	zielSatzlaenge?: number;
+	/** in %. */
+	zielPassivquote?: number;
+	/** Treffer je 100 Wörter. */
+	zielNominalstil?: number;
+	/** in %. */
+	zielLangeSaetze?: number;
 }
 
 export interface Ergebnis {

@@ -2,13 +2,14 @@
  * Analysekern. Importiert bewusst nichts aus "obsidian" (siehe Konzept 2.1),
  * damit dieser Ordner isoliert mit Vitest testbar bleibt.
  *
- * Stand M6: Fundament (M1), Lesbarkeits-/Rhythmus-Kennzahlen (M2),
- * Stilmarker (M3), Cursor-Satz-Ausschluss (M4), Editor-Markierungen (M5)
- * plus Passiv-Erkennung inkl. Futur-/Zustandspassiv-/Perfekt-Passiv-
- * Abgrenzung und Kompositazerlegung für den Frequenzabgleich (siehe
- * stil/passiv.ts, wortschatz.ts). `status`/`ziel` jeder Kennzahl bleiben
- * bis M7 neutral/undefined — die Zielprofile aus Konzept 4.3 existieren
- * noch nicht.
+ * Stand M7: Fundament (M1), Lesbarkeits-/Rhythmus-Kennzahlen (M2),
+ * Stilmarker (M3), Cursor-Satz-Ausschluss (M4), Editor-Markierungen (M5),
+ * Passiv-Erkennung/Komposita (M6) plus Zielprofile (Konzept 4.3):
+ * `status`/`ziel` der fünf profilgebundenen Kennzahlen (Schulstufe,
+ * Ø Satzlänge, Lange Sätze, Nominalstil, Passivquote) werden jetzt gegen
+ * `optionen.profil` bewertet, inkl. Hysterese (bewertung.ts) und
+ * Frontmatter-Override (`textanalyse-profil: <id>`). Ohne `profil` bleibt
+ * alles wie bisher `neutral` — rückwärtskompatibel zu M2-M6.
  */
 
 import { maskiere } from "./vorbereitung";
@@ -28,7 +29,8 @@ import { findePerfektkonstruktionen } from "./stil/perfekt";
 import { findeNominalstil } from "./stil/nominalstil";
 import { findeStreckverben } from "./stil/streckverben";
 import { findePassivkonstruktionen } from "./stil/passiv";
-import type { Ergebnis, Kennzahl, Befund } from "./types";
+import { bewerte, liesProfilUeberschreibung } from "./bewertung";
+import type { Ergebnis, Kennzahl, Befund, Profil, KennzahlStatus } from "./types";
 
 export type { Ergebnis, Kategorie, Sicherheit, Befund, Kennzahl } from "./types";
 export { maskiere } from "./vorbereitung";
@@ -62,6 +64,8 @@ export { findePerfektkonstruktionen, istWahrscheinlichPartizipZwei, SEIN_FORMEN 
 export { findeNominalstil, STANDARD_AUSNAHMEN } from "./stil/nominalstil";
 export { findeStreckverben, STANDARD_STRECKVERBEN } from "./stil/streckverben";
 export { findePassivkonstruktionen } from "./stil/passiv";
+export { bewerte, liesProfilUeberschreibung } from "./bewertung";
+export type { Profil, KennzahlStatus } from "./types";
 
 export interface AnalyseOptionen {
 	/** Auslöserzeilen für den Schlussteil (Konzept 2.3, Schritt B). Ab M7 aus den Settings befüllt. */
@@ -83,6 +87,27 @@ export interface AnalyseOptionen {
 	 * `sehr-langer-satz`/`seltenes-wort` falsch auffallen.
 	 */
 	cursorOffset?: number;
+	/**
+	 * Aktives Zielprofil (Konzept 4.3). Ohne Profil bleiben alle Kennzahlen
+	 * `status: "neutral"` (wie bisher) — Rückwärtskompatibilität zu M2-M6.
+	 * `profilUeberschreibungen` sind alle bekannten Profile (Standard +
+	 * eigene, aus den Settings), damit ein `textanalyse-profil: <id>` im
+	 * Frontmatter der Notiz das `profil`-Argument übersteuern kann; ohne
+	 * Treffer dort gilt `profil`.
+	 */
+	profil?: Profil;
+	profilUeberschreibungen?: Record<string, Profil>;
+	/**
+	 * Zuletzt angezeigter Status je Kennzahl-ID, für die Hysterese aus
+	 * Konzept 2.4 ("kein Farbflackern"). Der Aufrufer (main.ts) hält diesen
+	 * Zustand zwischen Analyseläufen und reicht ihn hier wieder herein —
+	 * `analysiere()` selbst bleibt zustandslos.
+	 */
+	vorherigeStatus?: Partial<Record<string, KennzahlStatus>>;
+	/** Wortlisten-Overrides (Konzept, Settings-Wortlisten-Editor). Ohne Angabe gelten die STANDARD_*-Listen der jeweiligen stil/*.ts-Module. */
+	fuellwoerterListe?: string[];
+	nominalstilAusnahmen?: Set<string>;
+	streckverbenListe?: string[];
 }
 
 function zeileAusZeichenoffset(rohtext: string, offset: number): number {
@@ -115,6 +140,12 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 	const satzlaengen = saetze.map((s) => s.woerter.length);
 	const quelle = optionen.frequenzquelle ?? alleBekanntQuelle;
 
+	const profilUeberschreibungId = liesProfilUeberschreibung(rohtext);
+	const profil =
+		(profilUeberschreibungId && optionen.profilUeberschreibungen?.[profilUeberschreibungId]) ||
+		optionen.profil;
+	const vorherigeStatus = optionen.vorherigeStatus ?? {};
+
 	const sprachpruefung = pruefeSprache(
 		woerterAnalysiert.map((w) => w.text),
 		optionen.sprachSchwelle
@@ -135,10 +166,10 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 		const rhythmusKlasse = klassifiziereRhythmus(mad);
 		const wortschatz = analysiereWortschatz(woerterAnalysiert, quelle);
 
-		const fuellwortBefunde = findeFuellwoerter(saetze, rohtext);
+		const fuellwortBefunde = findeFuellwoerter(saetze, rohtext, optionen.fuellwoerterListe);
 		const perfektBefunde = findePerfektkonstruktionen(saetze, rohtext);
-		const nominalstilBefunde = findeNominalstil(saetze, rohtext);
-		const streckverbBefunde = findeStreckverben(saetze, rohtext);
+		const nominalstilBefunde = findeNominalstil(saetze, rohtext, optionen.nominalstilAusnahmen);
+		const streckverbBefunde = findeStreckverben(saetze, rohtext, optionen.streckverbenListe);
 		const passivBefunde = findePassivkonstruktionen(saetze, rohtext);
 		const woerterAnzahl = woerterAnalysiert.length;
 		const proHundertWoerter = (anzahl: number) =>
@@ -164,6 +195,37 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 		const passivquote = saetze.length === 0 ? 0 : (saetzeMitPassiv / saetze.length) * 100;
 		const zustandspassivAnzahl = passivBefunde.length - echtePassivBefunde.length;
 
+		// Bewertung gegen das aktive Zielprofil (Konzept 4.3) — ohne Profil
+		// (kein `optionen.profil` übergeben) bleibt alles "neutral", wie vor
+		// M7. `zielBeschreibung` erscheint im Tooltip als Herkunftshinweis.
+		const zielBeschreibung = profil ? `Profil ${profil.name}, gesetzter Wert` : "";
+		const bewSchulstufe = bewerte(wstf.roh, profil?.zielSchulstufe, zielBeschreibung, vorherigeStatus.schulstufe);
+		const bewSatzlaenge = bewerte(
+			satzstatistik.mittelwert,
+			profil?.zielSatzlaenge,
+			zielBeschreibung,
+			vorherigeStatus["satzlaenge-mittel"]
+		);
+		const bewLangeSaetze = bewerte(
+			satzstatistik.anteilUeber20,
+			profil?.zielLangeSaetze,
+			zielBeschreibung,
+			vorherigeStatus["lange-saetze"]
+		);
+		const bewPassivquote = bewerte(
+			passivquote,
+			profil?.zielPassivquote,
+			zielBeschreibung,
+			vorherigeStatus.passivquote
+		);
+		const nominalstilGesamt = nominalstilBefunde.length + streckverbBefunde.length;
+		const bewNominalstil = bewerte(
+			proHundertWoerter(nominalstilGesamt),
+			profil?.zielNominalstil,
+			zielBeschreibung,
+			vorherigeStatus.nominalstil
+		);
+
 		kennzahlen.push(
 			{
 				id: "schulstufe",
@@ -174,11 +236,12 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 					wstf.ausgeschlosseneFachbegriffe > 0
 						? `ohne ${wstf.ausgeschlosseneFachbegriffe} Fachbegriffe: Schulstufe ${Math.round(wstf.korrigiert)}`
 						: undefined,
-				status: "neutral",
+				status: bewSchulstufe.status,
+				ziel: bewSchulstufe.ziel,
 				sicherheit: "hoch",
 				tooltip:
 					"Wiener Sachtextformel 1. Miss überwiegend Wortlänge, nicht nur Satzbau — deshalb die Fachwort-Korrektur daneben. " +
-					"Zielwerte je Profil kommen erst mit den Zielprofilen (noch nicht umgesetzt).",
+					(profil ? "Zielwert ist gesetzt, nicht gemessen, und in den Settings anpassbar." : "Kein Zielprofil aktiv."),
 			},
 			{
 				id: "lix",
@@ -195,9 +258,10 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 				wert: satzstatistik.mittelwert,
 				anzeige: `${satzstatistik.mittelwert.toFixed(1)} Wörter/Satz`,
 				nebenwert: `Median ${satzstatistik.median}, Max ${satzstatistik.max}`,
-				status: "neutral",
+				status: bewSatzlaenge.status,
+				ziel: bewSatzlaenge.ziel,
 				sicherheit: "hoch",
-				tooltip: "Mittlere Satzlänge in Wörtern. Zielwert je Profil kommt mit den Zielprofilen.",
+				tooltip: "Mittlere Satzlänge in Wörtern.",
 			},
 			{
 				id: "lange-saetze",
@@ -205,7 +269,8 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 				wert: satzstatistik.anteilUeber20,
 				anzeige: `${satzstatistik.anteilUeber20.toFixed(0)} % über 20 Wörter`,
 				nebenwert: `${satzstatistik.anteilUeber30.toFixed(0)} % über 30 Wörter`,
-				status: "neutral",
+				status: bewLangeSaetze.status,
+				ziel: bewLangeSaetze.ziel,
 				sicherheit: "hoch",
 				tooltip: "Anteil der Sätze mit mehr als 20 bzw. 30 Wörtern, in % aller Sätze.",
 			},
@@ -244,10 +309,11 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 			{
 				id: "nominalstil",
 				label: "Nominalstil",
-				wert: proHundertWoerter(nominalstilBefunde.length + streckverbBefunde.length),
-				anzeige: `${proHundertWoerter(nominalstilBefunde.length + streckverbBefunde.length).toFixed(1)} je 100 Wörter`,
+				wert: proHundertWoerter(nominalstilGesamt),
+				anzeige: `${proHundertWoerter(nominalstilGesamt).toFixed(1)} je 100 Wörter`,
 				nebenwert: `${streckverbBefunde.length} Streckverben darunter`,
-				status: "neutral",
+				status: bewNominalstil.status,
+				ziel: bewNominalstil.ziel,
 				sicherheit: "mittel",
 				tooltip:
 					"Substantivierungen (Suffixe wie -ung, -heit, -tion) plus Streckverben (\"zur Anwendung kommen\") je 100 Wörter. " +
@@ -270,7 +336,8 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 				wert: passivquote,
 				anzeige: `${passivquote.toFixed(0)} % der Sätze`,
 				nebenwert: zustandspassivAnzahl > 0 ? `${zustandspassivAnzahl} Zustandspassiv, separat` : undefined,
-				status: "neutral",
+				status: bewPassivquote.status,
+				ziel: bewPassivquote.ziel,
 				sicherheit: "mittel",
 				tooltip:
 					"Anteil der Sätze mit mindestens einer werden-Passiv- oder Perfekt-Passiv-Konstruktion. Zustandspassiv (sein + Partizip II ohne " +
