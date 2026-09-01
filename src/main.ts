@@ -59,6 +59,14 @@ export default class TextanalysePlugin extends Plugin {
 	private sichtbareKategorien = new Set<Kategorie>(ALLE_KATEGORIEN);
 	private vorherigeSichtbareKategorien: Set<Kategorie> | null = null;
 	private letztesErgebnis: Ergebnis | null = null;
+	/**
+	 * Zuletzt aktive Markdown-Notiz. Fällt aktualisiereAktiveNotiz()/
+	 * aktualisiereDecorations() zurück, wenn der aktive Leaf gerade keine
+	 * MarkdownView ist (z. B. Fokus auf der eigenen Sidebar oder dem
+	 * Datei-Explorer) — sonst würde das Panel bei jedem Klick in die
+	 * Sidebar fälschlich "Keine Notiz geöffnet" zeigen.
+	 */
+	private letzteMarkdownView: MarkdownView | null = null;
 
 	/**
 	 * Alles ab hier `public`, weil settings/Settings.ts direkt darauf
@@ -125,7 +133,14 @@ export default class TextanalysePlugin extends Plugin {
 			})
 		);
 		this.registerEvent(
-			this.app.workspace.on("active-leaf-change", () => {
+			this.app.workspace.on("active-leaf-change", (leaf) => {
+				if (leaf?.view instanceof MarkdownView) {
+					this.letzteMarkdownView = leaf.view;
+				}
+				// Klick in die eigene Sidebar macht SIE zum aktiven Leaf — ohne
+				// diesen Filter würde direkt danach neu "analysiert" (mit dem
+				// unten stehenden Fallback zwar unproblematisch, aber unnötig).
+				if (leaf?.view.getViewType() === ANALYSE_VIEW_TYPE) return;
 				this.aktualisiereAktiveNotiz({ erzwungen: false });
 				this.aktualisiereDecorations(); // sofort, neue Notiz hat noch keine Markierungen
 			})
@@ -226,11 +241,27 @@ export default class TextanalysePlugin extends Plugin {
 		return text.split(/\s+/).filter(Boolean).length > MAX_LIVE_WOERTER;
 	}
 
+	/**
+	 * Die für die Analyse relevante Notiz: normalerweise die aktive
+	 * MarkdownView, sonst (Fokus auf der eigenen Sidebar o. Ä.) die zuletzt
+	 * aktive — sofern sie noch offen ist. Ohne diesen Fallback würde das
+	 * Panel bei jedem Klick in die Sidebar "Keine Notiz geöffnet" zeigen.
+	 */
+	private aktiveOderLetzteMarkdownView(): MarkdownView | null {
+		const aktiv = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (aktiv) return aktiv;
+		if (!this.letzteMarkdownView) return null;
+		const nochOffen = this.app.workspace
+			.getLeavesOfType(this.letzteMarkdownView.getViewType())
+			.some((leaf) => leaf.view === this.letzteMarkdownView);
+		return nochOffen ? this.letzteMarkdownView : null;
+	}
+
 	private aktualisiereAktiveNotiz(optionen: { erzwungen: boolean }): void {
 		const view = this.getAnalyseView();
 		if (!view) return; // Panel nicht offen — nichts zu tun, spart Rechenzeit.
 
-		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		const markdownView = this.aktiveOderLetzteMarkdownView();
 		if (!markdownView) {
 			view.aktualisiere(null, { hinweis: "Keine Notiz geöffnet." });
 			return;
@@ -273,7 +304,7 @@ export default class TextanalysePlugin extends Plugin {
 
 	/** Aktualisiert die Editor-Markierungen (Konzept 2.4) — läuft unabhängig vom Panel, eigene Verzögerung. */
 	private aktualisiereDecorations(): void {
-		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		const markdownView = this.aktiveOderLetzteMarkdownView();
 		if (!markdownView) return;
 
 		const editor = markdownView.editor;
@@ -292,7 +323,7 @@ export default class TextanalysePlugin extends Plugin {
 	}
 
 	private dispatchSichtbarkeit(): void {
-		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		const markdownView = this.aktiveOderLetzteMarkdownView();
 		if (!markdownView) return;
 		const cm = holeEditorView(markdownView.editor);
 		if (!cm) return;
@@ -344,7 +375,7 @@ export default class TextanalysePlugin extends Plugin {
 
 	/** Klick auf Checklistenzeile ("erste") bzw. ‹/›-Navigation (Konzept, Abschnitt 6). */
 	private springeZuFundstelle(kategorie: Kategorie, richtung: "erste" | "vor" | "zurueck"): void {
-		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		const markdownView = this.aktiveOderLetzteMarkdownView();
 		if (!markdownView || !this.letztesErgebnis) return;
 
 		const treffer: Befund[] = this.letztesErgebnis.befunde
