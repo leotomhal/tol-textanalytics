@@ -24,7 +24,8 @@ const HABEN_FORMEN = new Set([
 	"hätte", "hättest", "hätten", "hättet",
 ]);
 
-const SEIN_FORMEN = new Set([
+/** Exportiert für passiv.ts (M6) — dieselben Formen leiten auch Zustandspassiv/Perfekt-Passiv ein. */
+export const SEIN_FORMEN = new Set([
 	"bin", "bist", "ist", "sind", "seid",
 	"war", "warst", "waren", "wart",
 	"sei", "seist", "seiest", "seien", "seiet",
@@ -49,19 +50,29 @@ export const UNREGELMAESSIGE_PARTIZIPIEN = new Set([
 const UNTRENNBARE_PRAEFIXE = ["ver", "be", "ent", "er", "zer", "emp", "miss"];
 
 /**
- * Heuristik ohne Lexikon: `ge-`-Präfix oder eines der untrennbaren Präfixe,
- * plus Endung `-t`/`-en`. Fängt weder alle regelmäßigen noch alle
- * unregelmäßigen Formen zuverlässig — siehe Sicherheitshinweis oben.
+ * Heuristik ohne Lexikon.
+ *
+ * Zwei Präfix-Fälle, bewusst unterschiedlich streng:
+ * - `ge`-Präfix + Endung `-t` ODER `-en`: `ge-` kommt im Deutschen nie als
+ *   Infinitiv-Anfang vor, nur als Partizip-Marker — hier sind beide
+ *   Endungen sicher (gemacht, gesehen, gesungen).
+ * - Untrennbares Präfix (ver-/be-/ent-/er-/zer-/emp-/miss-) + Endung NUR
+ *   `-t`: Diese Präfixe sind auch normale Infinitiv-Anfänge
+ *   ("bezahlen", "verstehen"). Reguläre Partizipien mit diesen Präfixen
+ *   enden immer auf `-t` (bezahlt, erreicht) — `-en`-Formen sind entweder
+ *   der Infinitiv selbst oder unregelmäßig und stehen dann in der Liste
+ *   oben. Ohne diese Einschränkung würde z. B. "wird bezahlen" (Futur)
+ *   fälschlich als Partizip-II-Fund durchgehen und in M6 die
+ *   Futur/Passiv-Abgrenzung unterlaufen.
  */
 export function istWahrscheinlichPartizipZwei(wort: string): boolean {
 	const w = wort.toLowerCase();
 	if (UNREGELMAESSIGE_PARTIZIPIEN.has(w)) return true;
 	if (w.length < 5) return false;
 
-	const hatPassendesPraefix = w.startsWith("ge") || UNTRENNBARE_PRAEFIXE.some((p) => w.startsWith(p));
-	if (!hatPassendesPraefix) return false;
-
-	return w.endsWith("t") || w.endsWith("en");
+	if (w.startsWith("ge")) return w.endsWith("t") || w.endsWith("en");
+	if (UNTRENNBARE_PRAEFIXE.some((p) => w.startsWith(p))) return w.endsWith("t");
+	return false;
 }
 
 const MAX_ABSTAND_TOKEN = 12;

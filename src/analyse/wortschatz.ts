@@ -71,6 +71,52 @@ export function mitUeberschreibungen(
 	};
 }
 
+/**
+ * Kompositazerlegung (Konzept, Phase 3/M6): "Sind alle Bestandteile
+ * häufig, gilt das Wort nicht als selten." Deutsche Komposita fallen sonst
+ * fast immer aus der Frequenzliste, obwohl sie verständlich sind
+ * ("Forschungsergebnis"). Rekursive Suche mit optionalen Fugenelementen,
+ * Tiefe und Teilwortlänge begrenzt, damit das nur bei tatsächlich
+ * unbekannten Wörtern nennenswerte Zeit kostet (der häufige Fall — Wort
+ * direkt bekannt — kostet weiterhin nur einen Set-Lookup).
+ */
+const FUGENELEMENTE = ["s", "es", "n", "en", "e", "er"];
+const MIN_TEILLAENGE = 4;
+const MAX_TEILE = 4; // Rekursionstiefe, verhindert pathologische Laufzeiten bei langen Wörtern.
+
+function kannZerlegtWerden(wort: string, quelle: Frequenzquelle, verbleibendeTeile: number): boolean {
+	if (quelle.istBekannt(wort)) return true;
+	if (verbleibendeTeile <= 1 || wort.length < MIN_TEILLAENGE * 2) return false;
+
+	for (let i = MIN_TEILLAENGE; i <= wort.length - MIN_TEILLAENGE; i++) {
+		const ersterTeil = wort.slice(0, i);
+		if (!quelle.istBekannt(ersterTeil)) continue;
+
+		const rest = wort.slice(i);
+		if (kannZerlegtWerden(rest, quelle, verbleibendeTeile - 1)) return true;
+
+		for (const fuge of FUGENELEMENTE) {
+			if (rest.startsWith(fuge) && kannZerlegtWerden(rest.slice(fuge.length), quelle, verbleibendeTeile - 1)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
+ * Wickelt eine Basis-Frequenzquelle so ein, dass zusätzlich zerlegbare
+ * Komposita als bekannt gelten, deren einzelne Bestandteile alle bekannt
+ * sind (mit optionalen Fugenelementen dazwischen).
+ */
+export function mitKompositazerlegung(basis: Frequenzquelle): Frequenzquelle {
+	return {
+		istBekannt(wort: string): boolean {
+			return kannZerlegtWerden(wort.toLowerCase(), basis, MAX_TEILE);
+		},
+	};
+}
+
 async function entpacke(base64Gzip: string): Promise<string> {
 	const bytes = Uint8Array.from(atob(base64Gzip), (c) => c.charCodeAt(0));
 	const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));

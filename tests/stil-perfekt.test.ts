@@ -20,6 +20,15 @@ describe("istWahrscheinlichPartizipZwei", () => {
 		expect(istWahrscheinlichPartizipZwei("gegangen")).toBe(true);
 	});
 
+	it("Regressionstest: verwechselt Infinitive mit untrennbarem Präfix nicht mit Partizip II", () => {
+		// Bug in einer früheren Fassung: "bezahlen" (Infinitiv) hätte wegen
+		// "be-" + Endung "-en" fälschlich als Partizip II gegolten — das
+		// hätte in M6 "wird bezahlen" (Futur) als Passiv durchgehen lassen.
+		expect(istWahrscheinlichPartizipZwei("bezahlen")).toBe(false);
+		expect(istWahrscheinlichPartizipZwei("verstehen")).toBe(false);
+		expect(istWahrscheinlichPartizipZwei("erreichen")).toBe(false);
+	});
+
 	it("lehnt gewöhnliche Wörter ohne passendes Präfix/Endung ab", () => {
 		expect(istWahrscheinlichPartizipZwei("Hund")).toBe(false);
 		expect(istWahrscheinlichPartizipZwei("schnell")).toBe(false);

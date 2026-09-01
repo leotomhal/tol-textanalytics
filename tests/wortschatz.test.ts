@@ -5,6 +5,7 @@ import {
 	alleBekanntQuelle,
 	mitUeberschreibungen,
 	findeSeltenesWortBefunde,
+	mitKompositazerlegung,
 } from "../src/analyse/wortschatz";
 import type { Frequenzquelle } from "../src/analyse/wortschatz";
 import { tokenisiereWoerter } from "../src/analyse/tokenize";
@@ -122,5 +123,49 @@ describe("findeSeltenesWortBefunde", () => {
 		const woerter = tokenisiereWoerter(text);
 		const befunde = findeSeltenesWortBefunde(woerter, alleBekanntQuelle, text);
 		expect(befunde).toHaveLength(0);
+	});
+});
+
+describe("mitKompositazerlegung", () => {
+	it("erkennt ein Kompositum aus zwei bekannten Wörtern als bekannt", () => {
+		const basis = testQuelle(["forschung", "ergebnis"]);
+		const quelle = mitKompositazerlegung(basis);
+		expect(quelle.istBekannt("Forschungsergebnis")).toBe(true);
+	});
+
+	it("erkennt ein Kompositum ohne Fugenelement als bekannt", () => {
+		const basis = testQuelle(["haus", "tuer"]);
+		const quelle = mitKompositazerlegung(basis);
+		expect(quelle.istBekannt("Haustuer")).toBe(true);
+	});
+
+	it("lehnt ein Wort ab, das nicht vollständig in bekannte Teile zerfällt", () => {
+		const basis = testQuelle(["forschung"]); // "ergebnis" fehlt
+		const quelle = mitKompositazerlegung(basis);
+		expect(quelle.istBekannt("Forschungsergebnis")).toBe(false);
+	});
+
+	it("lehnt ein kurzes unbekanntes Wort ab, ohne in Teile zu zerlegen (Mindestteillänge)", () => {
+		const basis = testQuelle(["ab", "cd"]); // beide zu kurz für MIN_TEILLAENGE
+		const quelle = mitKompositazerlegung(basis);
+		expect(quelle.istBekannt("abcd")).toBe(false);
+	});
+
+	it("erkennt ein direkt bekanntes Wort weiterhin ohne Zerlegung", () => {
+		const basis = testQuelle(["hund"]);
+		const quelle = mitKompositazerlegung(basis);
+		expect(quelle.istBekannt("Hund")).toBe(true);
+	});
+
+	it("zerlegt ein dreiteiliges Kompositum korrekt", () => {
+		const basis = testQuelle(["klima", "wandel", "bericht"]);
+		const quelle = mitKompositazerlegung(basis);
+		expect(quelle.istBekannt("Klimawandelbericht")).toBe(true);
+	});
+
+	it("lehnt einen erfundenen Kunstbegriff ab, der aus keinen bekannten Teilen besteht", () => {
+		const basis = testQuelle(["hund", "katze"]);
+		const quelle = mitKompositazerlegung(basis);
+		expect(quelle.istBekannt("Xylophonquetschwabbeligkeit")).toBe(false);
 	});
 });

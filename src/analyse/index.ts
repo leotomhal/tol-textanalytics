@@ -2,12 +2,13 @@
  * Analysekern. Importiert bewusst nichts aus "obsidian" (siehe Konzept 2.1),
  * damit dieser Ordner isoliert mit Vitest testbar bleibt.
  *
- * Stand M5: Fundament (M1), Lesbarkeits-/Rhythmus-Kennzahlen (M2),
- * Stilmarker (M3), Cursor-Satz-Ausschluss (M4) plus vollständige
- * "seltenes-wort"-Befunde (ein Befund pro Vorkommen, nicht nur die
- * Beispiele aus analysiereWortschatz) für die Editor-Markierung.
- * `status`/`ziel` jeder Kennzahl bleiben bis M7 neutral/undefined — die
- * Zielprofile aus Konzept 4.3 existieren noch nicht.
+ * Stand M6: Fundament (M1), Lesbarkeits-/Rhythmus-Kennzahlen (M2),
+ * Stilmarker (M3), Cursor-Satz-Ausschluss (M4), Editor-Markierungen (M5)
+ * plus Passiv-Erkennung inkl. Futur-/Zustandspassiv-/Perfekt-Passiv-
+ * Abgrenzung und Kompositazerlegung für den Frequenzabgleich (siehe
+ * stil/passiv.ts, wortschatz.ts). `status`/`ziel` jeder Kennzahl bleiben
+ * bis M7 neutral/undefined — die Zielprofile aus Konzept 4.3 existieren
+ * noch nicht.
  */
 
 import { maskiere } from "./vorbereitung";
@@ -26,6 +27,7 @@ import { findeFuellwoerter } from "./stil/fuellwoerter";
 import { findePerfektkonstruktionen } from "./stil/perfekt";
 import { findeNominalstil } from "./stil/nominalstil";
 import { findeStreckverben } from "./stil/streckverben";
+import { findePassivkonstruktionen } from "./stil/passiv";
 import type { Ergebnis, Kennzahl, Befund } from "./types";
 
 export type { Ergebnis, Kategorie, Sicherheit, Befund, Kennzahl } from "./types";
@@ -51,13 +53,15 @@ export {
 	alleBekanntQuelle,
 	ladeDerewoFrequenzquelle,
 	mitUeberschreibungen,
+	mitKompositazerlegung,
 	findeSeltenesWortBefunde,
 } from "./wortschatz";
 export type { Frequenzquelle, WortschatzErgebnis } from "./wortschatz";
 export { findeFuellwoerter, STANDARD_FUELLWOERTER } from "./stil/fuellwoerter";
-export { findePerfektkonstruktionen, istWahrscheinlichPartizipZwei } from "./stil/perfekt";
+export { findePerfektkonstruktionen, istWahrscheinlichPartizipZwei, SEIN_FORMEN } from "./stil/perfekt";
 export { findeNominalstil, STANDARD_AUSNAHMEN } from "./stil/nominalstil";
 export { findeStreckverben, STANDARD_STRECKVERBEN } from "./stil/streckverben";
+export { findePassivkonstruktionen } from "./stil/passiv";
 
 export interface AnalyseOptionen {
 	/** Auslöserzeilen für den Schlussteil (Konzept 2.3, Schritt B). Ab M7 aus den Settings befüllt. */
@@ -135,6 +139,7 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 		const perfektBefunde = findePerfektkonstruktionen(saetze, rohtext);
 		const nominalstilBefunde = findeNominalstil(saetze, rohtext);
 		const streckverbBefunde = findeStreckverben(saetze, rohtext);
+		const passivBefunde = findePassivkonstruktionen(saetze, rohtext);
 		const woerterAnzahl = woerterAnalysiert.length;
 		const proHundertWoerter = (anzahl: number) =>
 			woerterAnzahl === 0 ? 0 : (anzahl / woerterAnzahl) * 100;
@@ -145,8 +150,19 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 			...perfektBefunde,
 			...nominalstilBefunde,
 			...streckverbBefunde,
+			...passivBefunde,
 			...findeSeltenesWortBefunde(woerterAnalysiert, quelle, rohtext),
 		];
+
+		// Passivquote (Konzept 4.2): Anteil der SÄTZE mit mindestens einer
+		// Passivkonstruktion, in % aller Sätze. Zustandspassiv zählt bewusst
+		// nicht mit (siehe stil/passiv.ts).
+		const echtePassivBefunde = passivBefunde.filter((b) => b.kategorie === "passiv");
+		const saetzeMitPassiv = saetze.filter((s) =>
+			echtePassivBefunde.some((b) => b.von >= s.von && b.bis <= s.bis)
+		).length;
+		const passivquote = saetze.length === 0 ? 0 : (saetzeMitPassiv / saetze.length) * 100;
+		const zustandspassivAnzahl = passivBefunde.length - echtePassivBefunde.length;
 
 		kennzahlen.push(
 			{
@@ -247,6 +263,19 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 				tooltip:
 					"haben/sein + Partizip II im selben Satz, Abstand ≤ 12 Token. Informationswert, kein Zielprofil-Bezug im Konzept. " +
 					"Partizip-II-Erkennung ist ohne Lexikon heuristisch.",
+			},
+			{
+				id: "passivquote",
+				label: "Passivquote",
+				wert: passivquote,
+				anzeige: `${passivquote.toFixed(0)} % der Sätze`,
+				nebenwert: zustandspassivAnzahl > 0 ? `${zustandspassivAnzahl} Zustandspassiv, separat` : undefined,
+				status: "neutral",
+				sicherheit: "mittel",
+				tooltip:
+					"Anteil der Sätze mit mindestens einer werden-Passiv- oder Perfekt-Passiv-Konstruktion. Zustandspassiv (sein + Partizip II ohne " +
+					'"worden") zählt bewusst nicht mit, ist aber ohne Verblexikon nicht zuverlässig von aktivem Perfekt mit sein-Hilfsverb zu ' +
+					'unterscheiden ("Er ist gekommen" vs. "Der Brief ist geschrieben") — Sicherheit deshalb mittel, nicht hoch.',
 			}
 		);
 	}

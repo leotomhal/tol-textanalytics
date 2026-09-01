@@ -1,7 +1,12 @@
 import { MarkdownView, Plugin, type Editor, type WorkspaceLeaf } from "obsidian";
 import { EditorView } from "@codemirror/view";
 import { analysiere } from "./analyse/index";
-import { ladeDerewoFrequenzquelle, alleBekanntQuelle, mitUeberschreibungen } from "./analyse/wortschatz";
+import {
+	ladeDerewoFrequenzquelle,
+	alleBekanntQuelle,
+	mitUeberschreibungen,
+	mitKompositazerlegung,
+} from "./analyse/wortschatz";
 import type { Frequenzquelle } from "./analyse/wortschatz";
 import type { Befund, Ergebnis, Kategorie } from "./analyse/types";
 import { AnalyseView, ANALYSE_VIEW_TYPE } from "./view/AnalyseView";
@@ -74,7 +79,10 @@ export default class TextanalysePlugin extends Plugin {
 		// alleBekanntQuelle-Fallback (keine Fachwort-Korrektur).
 		ladeDerewoFrequenzquelle()
 			.then((quelle) => {
-				this.frequenzquelle = quelle;
+				// Kompositazerlegung (Konzept, Phase 3/M6) direkt auf die
+				// Basisliste anwenden — effektiveFrequenzquelle() legt die
+				// Ignorier-/Immer-markieren-Überschreibung darüber.
+				this.frequenzquelle = mitKompositazerlegung(quelle);
 				this.aktualisiereAktiveNotiz({ erzwungen: false });
 				this.aktualisiereDecorations();
 			})

@@ -24,7 +24,7 @@ describe("analysiere (Fundament M1 + Kennzahlen M2)", () => {
 		expect(ids).toEqual(
 			expect.arrayContaining([
 				"schulstufe", "lix", "satzlaenge-mittel", "lange-saetze", "rhythmus",
-				"fachbegriffe", "fuellwoerter", "nominalstil", "perfekt",
+				"fachbegriffe", "fuellwoerter", "nominalstil", "perfekt", "passivquote",
 			])
 		);
 		for (const k of ergebnis.kennzahlen) {
@@ -46,6 +46,22 @@ describe("analysiere (Fundament M1 + Kennzahlen M2)", () => {
 		for (const b of ergebnis.befunde) {
 			expect(text.slice(b.von, b.bis)).toBe(b.text);
 		}
+	});
+
+	it("berechnet die Passivquote und liefert Passiv-/Zustandspassiv-Befunde (M6)", () => {
+		const text = "Das Haus wird gebaut. Der Brief ist geschrieben. Der Handwerker arbeitet.";
+		const ergebnis = analysiere(text);
+
+		const passivquote = ergebnis.kennzahlen.find((k) => k.id === "passivquote");
+		expect(passivquote).toBeDefined();
+		// 1 von 3 Sätzen enthält echtes Passiv ("wird gebaut"); der
+		// Zustandspassiv-Satz zählt bewusst nicht mit.
+		expect(passivquote?.wert).toBeCloseTo(100 / 3, 1);
+		expect(passivquote?.nebenwert).toContain("Zustandspassiv");
+
+		const kategorien = new Set(ergebnis.befunde.map((b) => b.kategorie));
+		expect(kategorien.has("passiv")).toBe(true);
+		expect(kategorien.has("zustandspassiv")).toBe(true);
 	});
 
 	it("lässt kennzahlen und befunde leer, wenn kein deutscher Text erkannt wird", () => {
