@@ -1,0 +1,10 @@
+{
+	"id": "textanalyse",
+	"name": "Textanalyse",
+	"version": "0.0.1",
+	"minAppVersion": "1.5.0",
+	"description": "Prüft den aktiven Text auf Lesbarkeit, Satzbau, Wortschatz und Stil und markiert Befunde an der Fundstelle im Text.",
+	"author": "leotomhal",
+	"authorUrl": "",
+	"isDesktopOnly": false
+}
