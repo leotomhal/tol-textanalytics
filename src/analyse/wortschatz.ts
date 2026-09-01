@@ -21,6 +21,7 @@
  */
 
 import derewoDaten from "../data/derewo-top20k.json";
+import type { Befund } from "./types";
 
 export interface Frequenzquelle {
 	/** true, wenn `wort` (ohne Beachtung der Groß-/Kleinschreibung) in der Liste bekannt ist. */
@@ -46,6 +47,29 @@ class WortlistenFrequenzquelle implements Frequenzquelle {
  * besser als ein Absturz oder ein stillschweigend falscher Wert.
  */
 export const alleBekanntQuelle: Frequenzquelle = { istBekannt: () => true };
+
+/**
+ * Ignorierliste / "immer markieren" (Konzept 3.5). Wickelt eine
+ * Basis-Frequenzquelle so ein, dass ignorierte Wörter als bekannt gelten
+ * (weder als seltenes Wort gemeldet noch aus der WSTF-Korrektur
+ * herausgerechnet) und Wörter aus `immerMarkieren` als unbekannt gelten,
+ * selbst wenn die Basisliste sie kennt. `ignoriert` gewinnt, falls ein
+ * Wort versehentlich in beiden Listen steht.
+ */
+export function mitUeberschreibungen(
+	basis: Frequenzquelle,
+	ignoriert: ReadonlySet<string>,
+	immerMarkieren: ReadonlySet<string>
+): Frequenzquelle {
+	return {
+		istBekannt(wort: string): boolean {
+			const w = wort.toLowerCase();
+			if (ignoriert.has(w)) return true;
+			if (immerMarkieren.has(w)) return false;
+			return basis.istBekannt(wort);
+		},
+	};
+}
 
 async function entpacke(base64Gzip: string): Promise<string> {
 	const bytes = Uint8Array.from(atob(base64Gzip), (c) => c.charCodeAt(0));
@@ -111,4 +135,30 @@ export function analysiereWortschatz(
 		anteilUnbekannt: (unbekanntAnzahl / woerter.length) * 100,
 		seltensteWoerter,
 	};
+}
+
+/**
+ * Ein Befund pro unbekanntem Wort (jedes Vorkommen, nicht nur die
+ * Beispiele aus `analysiereWortschatz`) — Grundlage für die Markierung im
+ * Editor (Konzept 2.4) und die Checkliste. `ignorierbar: true` steuert die
+ * "kenne ich"-Aktion im Panel (Konzept 3.5).
+ */
+export function findeSeltenesWortBefunde(
+	woerter: { text: string; von: number; bis: number }[],
+	quelle: Frequenzquelle,
+	rohtext: string
+): Befund[] {
+	const befunde: Befund[] = [];
+	for (const wort of woerter) {
+		if (quelle.istBekannt(wort.text)) continue;
+		befunde.push({
+			kategorie: "seltenes-wort",
+			von: wort.von,
+			bis: wort.bis,
+			text: rohtext.slice(wort.von, wort.bis),
+			sicherheit: "mittel",
+			ignorierbar: true,
+		});
+	}
+	return befunde;
 }

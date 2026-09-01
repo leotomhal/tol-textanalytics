@@ -2,12 +2,12 @@
  * Analysekern. Importiert bewusst nichts aus "obsidian" (siehe Konzept 2.1),
  * damit dieser Ordner isoliert mit Vitest testbar bleibt.
  *
- * Stand M4: Fundament (M1), Lesbarkeits-/Rhythmus-Kennzahlen (M2),
- * Stilmarker (M3) plus Cursor-Satz-Ausschluss (Konzept 2.2, `cursorOffset`
- * in AnalyseOptionen) für die Obsidian-Integration. `status`/`ziel` jeder
- * Kennzahl bleiben bis M7 neutral/undefined — die Zielprofile aus Konzept
- * 4.3 existieren noch nicht. Wort-Fundstellen für "seltenes-wort"
- * (Markierung im Editor) kommen mit M5.
+ * Stand M5: Fundament (M1), Lesbarkeits-/Rhythmus-Kennzahlen (M2),
+ * Stilmarker (M3), Cursor-Satz-Ausschluss (M4) plus vollständige
+ * "seltenes-wort"-Befunde (ein Befund pro Vorkommen, nicht nur die
+ * Beispiele aus analysiereWortschatz) für die Editor-Markierung.
+ * `status`/`ziel` jeder Kennzahl bleiben bis M7 neutral/undefined — die
+ * Zielprofile aus Konzept 4.3 existieren noch nicht.
  */
 
 import { maskiere } from "./vorbereitung";
@@ -20,7 +20,7 @@ import {
 	klassifiziereRhythmus,
 	findeGleichfoermigePassagen,
 } from "./rhythmus";
-import { analysiereWortschatz, alleBekanntQuelle } from "./wortschatz";
+import { analysiereWortschatz, alleBekanntQuelle, findeSeltenesWortBefunde } from "./wortschatz";
 import type { Frequenzquelle } from "./wortschatz";
 import { findeFuellwoerter } from "./stil/fuellwoerter";
 import { findePerfektkonstruktionen } from "./stil/perfekt";
@@ -46,7 +46,13 @@ export {
 	klassifiziereRhythmus,
 	findeGleichfoermigePassagen,
 } from "./rhythmus";
-export { analysiereWortschatz, alleBekanntQuelle, ladeDerewoFrequenzquelle } from "./wortschatz";
+export {
+	analysiereWortschatz,
+	alleBekanntQuelle,
+	ladeDerewoFrequenzquelle,
+	mitUeberschreibungen,
+	findeSeltenesWortBefunde,
+} from "./wortschatz";
 export type { Frequenzquelle, WortschatzErgebnis } from "./wortschatz";
 export { findeFuellwoerter, STANDARD_FUELLWOERTER } from "./stil/fuellwoerter";
 export { findePerfektkonstruktionen, istWahrscheinlichPartizipZwei } from "./stil/perfekt";
@@ -139,6 +145,7 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 			...perfektBefunde,
 			...nominalstilBefunde,
 			...streckverbBefunde,
+			...findeSeltenesWortBefunde(woerterAnalysiert, quelle, rohtext),
 		];
 
 		kennzahlen.push(

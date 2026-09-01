@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
-import { rendereePanel, filtereBefundeAufBereich, zaehleWoerterImBereich } from "../src/view/Panel";
-import { analysiere } from "../src/analyse/index";
+import { describe, expect, it, vi } from "vitest";
+import {
+	rendereePanel,
+	filtereBefundeAufBereich,
+	zaehleWoerterImBereich,
+	distinkteSelteneWoerter,
+} from "../src/view/Panel";
+import { analysiere, alleBekanntQuelle } from "../src/analyse/index";
+import { mitUeberschreibungen } from "../src/analyse/wortschatz";
 import type { Befund, Ergebnis } from "../src/analyse/types";
 
 function leeresErgebnis(): Ergebnis {
@@ -105,5 +111,95 @@ describe("rendereePanel", () => {
 		rendereePanel(container, leeresErgebnis());
 		rendereePanel(container, leeresErgebnis());
 		expect(container.querySelectorAll(".textanalyse-wortzahl")).toHaveLength(1);
+	});
+
+	it("ruft aufErsteFundstelle beim Klick auf eine Checklistenzeile auf", () => {
+		const container = document.createElement("div");
+		const ergebnis = analysiere("Das ist eigentlich ganz einfach und wirklich eigentlich klar.");
+		const aufErsteFundstelle = vi.fn();
+		rendereePanel(container, ergebnis, { aufErsteFundstelle });
+
+		const zeile = container.querySelector(".textanalyse-checkliste-zeile.textanalyse-checkliste-klickbar");
+		expect(zeile).not.toBeNull();
+		(zeile as HTMLElement).click();
+		expect(aufErsteFundstelle).toHaveBeenCalledWith("fuellwort");
+	});
+
+	it("ruft aufNavigiere mit der richtigen Richtung auf und stoppt die Klick-Weiterleitung an die Zeile", () => {
+		const container = document.createElement("div");
+		const ergebnis = analysiere("Das ist eigentlich ganz einfach und wirklich eigentlich klar.");
+		const aufNavigiere = vi.fn();
+		const aufErsteFundstelle = vi.fn();
+		rendereePanel(container, ergebnis, { aufNavigiere, aufErsteFundstelle });
+
+		const buttons = container.querySelectorAll(".textanalyse-nav-button");
+		expect(buttons.length).toBeGreaterThan(0);
+		(buttons[0] as HTMLElement).click();
+		expect(aufNavigiere).toHaveBeenCalledWith("fuellwort", "zurueck");
+		// Klick auf den Button darf nicht zusätzlich die Zeile als Ganzes auslösen.
+		expect(aufErsteFundstelle).not.toHaveBeenCalled();
+	});
+
+	it("toggelt die Sichtbarkeit separat vom Sprung zur Fundstelle (kein Konflikt zwischen beiden Klick-Verhalten)", () => {
+		const container = document.createElement("div");
+		const ergebnis = analysiere("Das ist eigentlich ganz einfach und wirklich eigentlich klar.");
+		const aufSichtbarkeitToggle = vi.fn();
+		const aufErsteFundstelle = vi.fn();
+		rendereePanel(container, ergebnis, {
+			aufSichtbarkeitToggle,
+			aufErsteFundstelle,
+			sichtbareKategorien: new Set(["fuellwort"]),
+		});
+
+		const schalter = container.querySelector(".textanalyse-sichtbarkeit-schalter") as HTMLElement;
+		expect(schalter).not.toBeNull();
+		schalter.click();
+		expect(aufSichtbarkeitToggle).toHaveBeenCalledWith("fuellwort");
+		expect(aufErsteFundstelle).not.toHaveBeenCalled();
+	});
+
+	it("zeigt seltene Wörter mit 'kenne ich'-Button und löst den Callback mit dem Wort aus", () => {
+		const container = document.createElement("div");
+		const quelle = mitUeberschreibungen(alleBekanntQuelle, new Set(), new Set(["fachbegriff"]));
+		const ergebnis = analysiere("Das ist ein Fachbegriff im Text.", { frequenzquelle: quelle });
+		const aufWortIgnorieren = vi.fn();
+		rendereePanel(container, ergebnis, { aufWortIgnorieren });
+
+		const button = container.querySelector(".textanalyse-wort-ignorieren");
+		expect(button).not.toBeNull();
+		(button as HTMLElement).click();
+		expect(aufWortIgnorieren).toHaveBeenCalledWith("Fachbegriff");
+	});
+
+	it("löst aufWortImmerMarkieren beim Absenden des Formulars aus", () => {
+		const container = document.createElement("div");
+		rendereePanel(container, analysiere("Ein Satz mit genug Inhalt für die Analyse hier."), {
+			aufWortImmerMarkieren: vi.fn(),
+		});
+		const eingabe = container.querySelector(".textanalyse-immer-markieren-eingabe") as HTMLInputElement;
+		const button = container.querySelector(".textanalyse-immer-markieren-button") as HTMLElement;
+		expect(eingabe).not.toBeNull();
+		expect(button).not.toBeNull();
+	});
+});
+
+describe("distinkteSelteneWoerter", () => {
+	function seltenesWort(text: string): Befund {
+		return { kategorie: "seltenes-wort", von: 0, bis: text.length, text, sicherheit: "mittel", ignorierbar: true };
+	}
+
+	it("dedupliziert unabhängig von Groß-/Kleinschreibung und behält die erste Schreibweise", () => {
+		const befunde = [seltenesWort("Fachbegriff"), seltenesWort("fachbegriff"), seltenesWort("Anderswort")];
+		expect(distinkteSelteneWoerter(befunde)).toEqual(["Fachbegriff", "Anderswort"]);
+	});
+
+	it("ignoriert Befunde anderer Kategorien", () => {
+		const andere: Befund = { kategorie: "fuellwort", von: 0, bis: 3, text: "abc", sicherheit: "hoch", ignorierbar: false };
+		expect(distinkteSelteneWoerter([andere])).toEqual([]);
+	});
+
+	it("deckelt die Liste auf 20 Einträge", () => {
+		const befunde = Array.from({ length: 30 }, (_, i) => seltenesWort(`wort${i}`));
+		expect(distinkteSelteneWoerter(befunde)).toHaveLength(20);
 	});
 });
