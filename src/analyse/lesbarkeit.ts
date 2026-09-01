@@ -10,7 +10,6 @@
 import type { Wort } from "./tokenize";
 import { zaehleSilben } from "./silben";
 import type { Frequenzquelle } from "./wortschatz";
-import { derewoFrequenzquelle } from "./wortschatz";
 
 function mittelwert(werte: number[]): number {
 	if (werte.length === 0) return 0;
@@ -59,7 +58,7 @@ export interface WstfErgebnis {
 export function berechneWSTF(
 	woerter: Wort[],
 	satzlaengen: number[],
-	quelle: Frequenzquelle = derewoFrequenzquelle
+	quelle: Frequenzquelle
 ): WstfErgebnis {
 	const sl = mittelwert(satzlaengen);
 	const twRoh = teilwerte(woerter);

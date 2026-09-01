@@ -1,21 +1,38 @@
-import { describe, expect, it } from "vitest";
-import { analysiereWortschatz, derewoFrequenzquelle } from "../src/analyse/wortschatz";
+import { beforeAll, describe, expect, it } from "vitest";
+import { analysiereWortschatz, ladeDerewoFrequenzquelle, alleBekanntQuelle } from "../src/analyse/wortschatz";
 import type { Frequenzquelle } from "../src/analyse/wortschatz";
 import { tokenisiereWoerter } from "../src/analyse/tokenize";
 
-describe("derewoFrequenzquelle", () => {
+describe("ladeDerewoFrequenzquelle", () => {
+	let quelle: Frequenzquelle;
+
+	beforeAll(async () => {
+		quelle = await ladeDerewoFrequenzquelle();
+	});
+
 	it("erkennt gängige deutsche Wörter als bekannt", () => {
 		for (const wort of ["Hund", "Universität", "schnell", "Forschung"]) {
-			expect(derewoFrequenzquelle.istBekannt(wort)).toBe(true);
+			expect(quelle.istBekannt(wort)).toBe(true);
 		}
 	});
 
 	it("ist unabhängig von Groß-/Kleinschreibung", () => {
-		expect(derewoFrequenzquelle.istBekannt("HUND")).toBe(derewoFrequenzquelle.istBekannt("hund"));
+		expect(quelle.istBekannt("HUND")).toBe(quelle.istBekannt("hund"));
 	});
 
 	it("erkennt einen erfundenen Kunstbegriff nicht als bekannt", () => {
-		expect(derewoFrequenzquelle.istBekannt("Xylophonquetschwabbeligkeit")).toBe(false);
+		expect(quelle.istBekannt("Xylophonquetschwabbeligkeit")).toBe(false);
+	});
+
+	it("liefert bei zweitem Aufruf dieselbe (gecachte) Instanz", async () => {
+		const zweiterAufruf = await ladeDerewoFrequenzquelle();
+		expect(zweiterAufruf).toBe(quelle);
+	});
+});
+
+describe("alleBekanntQuelle", () => {
+	it("meldet jedes Wort als bekannt (Fallback ohne geladene Wortliste)", () => {
+		expect(alleBekanntQuelle.istBekannt("Xylophonquetschwabbeligkeit")).toBe(true);
 	});
 });
 

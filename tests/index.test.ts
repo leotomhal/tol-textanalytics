@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analysiere } from "../src/analyse/index";
+import { ladeDerewoFrequenzquelle } from "../src/analyse/wortschatz";
 
 describe("analysiere (Fundament M1 + Kennzahlen M2)", () => {
 	it("liefert ein vollständiges Ergebnis-Objekt für einen einfachen deutschen Text", () => {
@@ -61,5 +62,23 @@ describe("analysiere (Fundament M1 + Kennzahlen M2)", () => {
 		const text = "Ein kurzer deutscher Testsatz mit ausreichend Wörtern. ".repeat(50);
 		const ergebnis = analysiere(text);
 		expect(ergebnis.dauerMs).toBeLessThan(1000);
+	});
+
+	it("ohne übergebene Frequenzquelle: Fachbegriffe-Kennzahl bleibt bei 0 % (alleBekanntQuelle-Fallback)", () => {
+		const text = "Die Interdependenztheorie beschreibt komplexe Wechselwirkungsstrukturen zwischen Organisationen.";
+		const ergebnis = analysiere(text);
+		const fachbegriffe = ergebnis.kennzahlen.find((k) => k.id === "fachbegriffe");
+		expect(fachbegriffe?.wert).toBe(0);
+	});
+
+	it("mit echter DeReWo-Wortliste: Fachbegriffe werden erkannt und wirken auf die WSTF-Korrektur", async () => {
+		const quelle = await ladeDerewoFrequenzquelle();
+		const text =
+			"Ein internationales Forscherteam hat mithilfe hochauflösender Massenspektrometrie die Interaktion zwischen Photosyntheseproteinen und Thylakoidmembranen untersucht.";
+		const ergebnis = analysiere(text, { frequenzquelle: quelle });
+		const fachbegriffe = ergebnis.kennzahlen.find((k) => k.id === "fachbegriffe");
+		const schulstufe = ergebnis.kennzahlen.find((k) => k.id === "schulstufe");
+		expect(fachbegriffe?.wert).toBeGreaterThan(0);
+		expect(schulstufe?.nebenwert).toBeDefined();
 	});
 });

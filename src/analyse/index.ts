@@ -21,7 +21,7 @@ import {
 	klassifiziereRhythmus,
 	findeGleichfoermigePassagen,
 } from "./rhythmus";
-import { analysiereWortschatz, derewoFrequenzquelle } from "./wortschatz";
+import { analysiereWortschatz, alleBekanntQuelle } from "./wortschatz";
 import type { Frequenzquelle } from "./wortschatz";
 import type { Ergebnis, Kennzahl } from "./types";
 
@@ -43,7 +43,7 @@ export {
 	klassifiziereRhythmus,
 	findeGleichfoermigePassagen,
 } from "./rhythmus";
-export { analysiereWortschatz, derewoFrequenzquelle } from "./wortschatz";
+export { analysiereWortschatz, alleBekanntQuelle, ladeDerewoFrequenzquelle } from "./wortschatz";
 export type { Frequenzquelle, WortschatzErgebnis } from "./wortschatz";
 
 export interface AnalyseOptionen {
@@ -51,7 +51,12 @@ export interface AnalyseOptionen {
 	schlussteilAusloeser?: string[];
 	/** Schwellwert für die Deutscherkennung (Konzept 2.5). Standard 5 %. */
 	sprachSchwelle?: number;
-	/** Austauschbar für Tests; Standard ist die DeReWo-Wortliste (siehe wortschatz.ts). */
+	/**
+	 * Standard: `alleBekanntQuelle` (keine Fachwort-Korrektur/Wortschatz-Signal).
+	 * Die echte DeReWo-Wortliste lädt asynchron (`ladeDerewoFrequenzquelle()`,
+	 * siehe wortschatz.ts) — einmal beim Plugin-Start laden (ab M4) und hier
+	 * übergeben, damit `analysiere()` selbst synchron bleiben kann.
+	 */
 	frequenzquelle?: Frequenzquelle;
 }
 
@@ -71,7 +76,7 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 	const woerterAnalysiert = saetze.flatMap((s) => s.woerter);
 	const woerterGesamt = tokenisiereWoerter(rohtext).length;
 	const satzlaengen = saetze.map((s) => s.woerter.length);
-	const quelle = optionen.frequenzquelle ?? derewoFrequenzquelle;
+	const quelle = optionen.frequenzquelle ?? alleBekanntQuelle;
 
 	const sprachpruefung = pruefeSprache(
 		woerterAnalysiert.map((w) => w.text),
