@@ -24,21 +24,36 @@ function zaehleWoerter(abschnitt: string): number {
 
 class Puffer {
 	private zeichen: string[];
+	// `maskiereMarkdown` ruft `arbeitstext()` vor jedem der ~20 Durchläufe
+	// erneut auf, damit jeder Durchlauf den Stand vorheriger Durchläufe sieht
+	// (z. B. Tags nach Überschriften, Kommentar bei Punkt 13). In einem
+	// typischen Dokument findet aber der Großteil der Durchläufe nichts zu
+	// maskieren — ohne Cache würde trotzdem bei jedem einzelnen der komplette
+	// Text per Array.join() neu zusammengesetzt (O(Durchläufe × Textlänge)).
+	// Der Cache macht daraus effektiv einen einzigen Join für alle
+	// Leseaufrufe zwischen zwei tatsächlichen Änderungen.
+	private cache: string | null = null;
 
 	constructor(text: string) {
 		this.zeichen = Array.from(text);
 	}
 
 	maskieren(von: number, bis: number): void {
+		let geaendert = false;
 		for (let i = von; i < bis && i < this.zeichen.length; i++) {
 			if (this.zeichen[i] !== "\n") {
 				this.zeichen[i] = " ";
+				geaendert = true;
 			}
 		}
+		if (geaendert) this.cache = null;
 	}
 
 	toString(): string {
-		return this.zeichen.join("");
+		if (this.cache === null) {
+			this.cache = this.zeichen.join("");
+		}
+		return this.cache;
 	}
 }
 
@@ -244,6 +259,31 @@ function maskiereMarkdown(puffer: Puffer, arbeitstext: () => string): number {
 
 	return zitatWoerter;
 }
+
+/**
+ * Startliste für Schritt B (Konzept 2.3, 8.4). Das Konzept verlangt
+ * ausdrücklich, diese Liste "vor Phase 1 einmal durch fünf bis zehn
+ * [echte Pressemitteilungs-]Dateien" abzuleiten — solche Dateien lagen bei
+ * der Umsetzung nicht vor. Diese Liste ist stattdessen aus allgemein
+ * üblichen deutschen PM-Konventionen zusammengestellt, NICHT aus echten
+ * Dateien geprüft. In den Settings editierbar; gegen eigene Formulierungen
+ * austauschen oder ergänzen, sobald reale Beispiele vorliegen.
+ */
+export const STANDARD_SCHLUSSTEIL_AUSLOESER = [
+	"Zur Studie:",
+	"Zur Originalpublikation:",
+	"Originalpublikation:",
+	"Publikation:",
+	"Weitere Informationen:",
+	"Kontakt für die Medien:",
+	"Kontakt:",
+	"Pressekontakt:",
+	"Ansprechpartner für Medien:",
+	"Bildunterschrift:",
+	"Bildnachweis:",
+	"Über die Universität",
+	"Über die MLU",
+];
 
 /**
  * Schritt B: Ab der ersten Zeile, die mit einem der `auslöser`-Strings

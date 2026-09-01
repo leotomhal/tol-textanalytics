@@ -1,0 +1,8 @@
+{
+	"beschreibung": "Fachtext mit hoher Fachwortdichte (Konzept 7). Ohne echte Frequenzquelle (Standard im Korpus-Runner: alleBekanntQuelle) zeigt sich die Dichte nicht in der Fachbegriffe-Kennzahl, aber in der WSTF-Schulstufe über die Wortlänge/Silbenzahl — siehe tests/index.test.ts für den Fall mit echter DeReWo-Quelle und Fachwort-Korrektur.",
+	"istDeutsch": true,
+	"satzlaengen": [8, 21, 16],
+	"woerterGesamt": 45,
+	"woerterMaskiert": 0,
+	"enthaeltKategorien": ["nominalstil"]
+}

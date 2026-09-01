@@ -1,6 +1,6 @@
 import { MarkdownView, Plugin, type Editor, type WorkspaceLeaf } from "obsidian";
 import { EditorView } from "@codemirror/view";
-import { analysiere } from "./analyse/index";
+import { analysiere, STANDARD_SCHLUSSTEIL_AUSLOESER } from "./analyse/index";
 import {
 	ladeDerewoFrequenzquelle,
 	alleBekanntQuelle,
@@ -70,7 +70,8 @@ export default class TextanalysePlugin extends Plugin {
 	fuellwoerterListe: string[] = [];
 	nominalstilAusnahmenListe: string[] = [];
 	streckverbenListe: string[] = [];
-	schlussteilAusloeser: string[] = [];
+	/** Startliste (Konzept 8.4, nicht aus echten Dateien abgeleitet — siehe vorbereitung.ts). In den Settings anpassbar. */
+	schlussteilAusloeser: string[] = [...STANDARD_SCHLUSSTEIL_AUSLOESER];
 
 	/** Hysterese (Konzept 2.4) — letzter angezeigter Status je Kennzahl-ID. */
 	private vorherigeStatus: Partial<Record<string, KennzahlStatus>> = {};
@@ -147,7 +148,7 @@ export default class TextanalysePlugin extends Plugin {
 		this.fuellwoerterListe = daten?.fuellwoerterListe ?? [];
 		this.nominalstilAusnahmenListe = daten?.nominalstilAusnahmenListe ?? [];
 		this.streckverbenListe = daten?.streckverbenListe ?? [];
-		this.schlussteilAusloeser = daten?.schlussteilAusloeser ?? [];
+		this.schlussteilAusloeser = daten?.schlussteilAusloeser ?? [...STANDARD_SCHLUSSTEIL_AUSLOESER];
 	}
 
 	/** Öffentlich, damit Settings.ts nach jeder Änderung speichern und neu analysieren lassen kann. */

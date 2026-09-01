@@ -1,0 +1,8 @@
+{
+	"beschreibung": "Text aus überwiegend Überschriften und Listen (Konzept 7). Sollergebnis: fast nichts zu analysieren, kein Absturz, keine irreführenden Kennzahlen — alle Wörter stecken in maskierten Überschriften/Listen, es bleiben keine Sätze übrig.",
+	"istDeutsch": false,
+	"satzlaengen": [],
+	"woerterGesamt": 44,
+	"woerterMaskiert": 44,
+	"maxBefunde": 0
+}

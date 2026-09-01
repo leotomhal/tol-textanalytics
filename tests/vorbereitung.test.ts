@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { maskiere } from "../src/analyse/vorbereitung";
+import { maskiere, STANDARD_SCHLUSSTEIL_AUSLOESER } from "../src/analyse/vorbereitung";
 
 describe("maskiere", () => {
 	it("erhält die Textlänge (längenerhaltend)", () => {
@@ -158,5 +158,15 @@ describe("maskiere", () => {
 		const titelVon = text.indexOf("# Titel");
 		const titelBis = titelVon + "# Titel".length;
 		expect(ergebnis.maskiert.slice(titelVon, titelBis).trim()).toBe("");
+	});
+
+	describe("STANDARD_SCHLUSSTEIL_AUSLOESER (Konzept 8.4)", () => {
+		it("ist nicht leer und greift bei Verwendung als Auslöserliste", () => {
+			expect(STANDARD_SCHLUSSTEIL_AUSLOESER.length).toBeGreaterThan(0);
+			const text = "Erster Absatz mit Inhalt.\n\nZur Studie:\nJournal, 2026.";
+			const ergebnis = maskiere(text, STANDARD_SCHLUSSTEIL_AUSLOESER);
+			expect(ergebnis.maskiert).toContain("Erster Absatz mit Inhalt.");
+			expect(ergebnis.maskiert).not.toContain("Journal, 2026");
+		});
 	});
 });

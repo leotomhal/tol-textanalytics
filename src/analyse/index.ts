@@ -33,7 +33,7 @@ import { bewerte, liesProfilUeberschreibung } from "./bewertung";
 import type { Ergebnis, Kennzahl, Befund, Profil, KennzahlStatus } from "./types";
 
 export type { Ergebnis, Kategorie, Sicherheit, Befund, Kennzahl } from "./types";
-export { maskiere } from "./vorbereitung";
+export { maskiere, STANDARD_SCHLUSSTEIL_AUSLOESER } from "./vorbereitung";
 export type { MaskierungsErgebnis } from "./vorbereitung";
 export { segmentiereSaetze, tokenisiereWoerter } from "./tokenize";
 export type { Satz, Wort } from "./tokenize";
