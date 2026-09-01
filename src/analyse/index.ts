@@ -2,13 +2,12 @@
  * Analysekern. Importiert bewusst nichts aus "obsidian" (siehe Konzept 2.1),
  * damit dieser Ordner isoliert mit Vitest testbar bleibt.
  *
- * Stand M2: Fundament (M1) plus Lesbarkeits- und Rhythmus-Kennzahlen (WSTF
- * inkl. Fachwort-Korrektur, LIX, Satzlängenstatistik, Rhythmus/MAD) sowie
- * die Fachbegriff-Kennzahl aus wortschatz.ts. `status` und `ziel` jeder
- * Kennzahl bleiben bis M7 neutral/undefined — die Zielprofile aus Konzept
- * 4.3 existieren noch nicht. Stilmarker-Befunde (Füllwörter, Passiv, …)
- * kommen mit M3/M6; Wort-Fundstellen für "seltenes-wort" (Markierung im
- * Editor) mit M5.
+ * Stand M3: Fundament (M1) plus Lesbarkeits- und Rhythmus-Kennzahlen (M2)
+ * plus Stilmarker (Füllwörter, Perfekt, Nominalstil, Streckverben — ohne
+ * Passiv, das kommt mit M6). `status` und `ziel` jeder Kennzahl bleiben bis
+ * M7 neutral/undefined — die Zielprofile aus Konzept 4.3 existieren noch
+ * nicht. Wort-Fundstellen für "seltenes-wort" (Markierung im Editor)
+ * kommen mit M5.
  */
 
 import { maskiere } from "./vorbereitung";
@@ -23,7 +22,11 @@ import {
 } from "./rhythmus";
 import { analysiereWortschatz, alleBekanntQuelle } from "./wortschatz";
 import type { Frequenzquelle } from "./wortschatz";
-import type { Ergebnis, Kennzahl } from "./types";
+import { findeFuellwoerter } from "./stil/fuellwoerter";
+import { findePerfektkonstruktionen } from "./stil/perfekt";
+import { findeNominalstil } from "./stil/nominalstil";
+import { findeStreckverben } from "./stil/streckverben";
+import type { Ergebnis, Kennzahl, Befund } from "./types";
 
 export type { Ergebnis, Kategorie, Sicherheit, Befund, Kennzahl } from "./types";
 export { maskiere } from "./vorbereitung";
@@ -45,6 +48,10 @@ export {
 } from "./rhythmus";
 export { analysiereWortschatz, alleBekanntQuelle, ladeDerewoFrequenzquelle } from "./wortschatz";
 export type { Frequenzquelle, WortschatzErgebnis } from "./wortschatz";
+export { findeFuellwoerter, STANDARD_FUELLWOERTER } from "./stil/fuellwoerter";
+export { findePerfektkonstruktionen, istWahrscheinlichPartizipZwei } from "./stil/perfekt";
+export { findeNominalstil, STANDARD_AUSNAHMEN } from "./stil/nominalstil";
+export { findeStreckverben, STANDARD_STRECKVERBEN } from "./stil/streckverben";
 
 export interface AnalyseOptionen {
 	/** Auslöserzeilen für den Schlussteil (Konzept 2.3, Schritt B). Ab M7 aus den Settings befüllt. */
@@ -84,10 +91,12 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 	);
 
 	const kennzahlen: Kennzahl[] = [];
-	const befunde = findeGleichfoermigePassagen(saetze, rohtext);
+	let befunde: Befund[] = [];
 
-	// Kennzahlen nur berechnen, wenn es überhaupt Sätze gibt — sonst sind
-	// Mittelwerte etc. undefiniert (0/0) und die Anzeige wäre irreführend.
+	// Kennzahlen und Stilmarker nur berechnen, wenn es überhaupt Sätze gibt
+	// und der Text als Deutsch erkannt wurde — sonst sind Mittelwerte etc.
+	// undefiniert (0/0), und die Stilmarker-Wortlisten sind deutschspezifisch
+	// (auf Englisch würde z. B. "-tion" ständig als Nominalstil anschlagen).
 	if (sprachpruefung.istDeutsch && saetze.length > 0) {
 		const wstf = berechneWSTF(woerterAnalysiert, satzlaengen, quelle);
 		const lix = berechneLIX(woerterAnalysiert, satzlaengen);
@@ -95,6 +104,22 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 		const mad = berechneMAD(satzlaengen);
 		const rhythmusKlasse = klassifiziereRhythmus(mad);
 		const wortschatz = analysiereWortschatz(woerterAnalysiert, quelle);
+
+		const fuellwortBefunde = findeFuellwoerter(saetze, rohtext);
+		const perfektBefunde = findePerfektkonstruktionen(saetze, rohtext);
+		const nominalstilBefunde = findeNominalstil(saetze, rohtext);
+		const streckverbBefunde = findeStreckverben(saetze, rohtext);
+		const woerterAnzahl = woerterAnalysiert.length;
+		const proHundertWoerter = (anzahl: number) =>
+			woerterAnzahl === 0 ? 0 : (anzahl / woerterAnzahl) * 100;
+
+		befunde = [
+			...findeGleichfoermigePassagen(saetze, rohtext),
+			...fuellwortBefunde,
+			...perfektBefunde,
+			...nominalstilBefunde,
+			...streckverbBefunde,
+		];
 
 		kennzahlen.push(
 			{
@@ -163,6 +188,38 @@ export function analysiere(rohtext: string, optionen: AnalyseOptionen = {}): Erg
 					"Anteil der Wörter außerhalb der DeReWo-Wortliste. Abweichung vom Konzept: Es liegt keine nach Häufigkeit sortierte Liste vor, " +
 					"sondern nur ein Bekanntheits-Wörterbuch ohne Top-5.000/20.000-Abstufung (siehe scripts/derewo-aufbereiten.ts). " +
 					"Eigennamen laufen mangels Erkennung als Fachbegriffe mit.",
+			},
+			{
+				id: "fuellwoerter",
+				label: "Füllwörter",
+				wert: proHundertWoerter(fuellwortBefunde.length),
+				anzeige: `${proHundertWoerter(fuellwortBefunde.length).toFixed(1)} je 100 Wörter`,
+				status: "neutral",
+				sicherheit: "hoch",
+				tooltip: "Treffer aus der Füllwortliste je 100 Wörter. Liste editierbar in den Settings (noch nicht umgesetzt).",
+			},
+			{
+				id: "nominalstil",
+				label: "Nominalstil",
+				wert: proHundertWoerter(nominalstilBefunde.length + streckverbBefunde.length),
+				anzeige: `${proHundertWoerter(nominalstilBefunde.length + streckverbBefunde.length).toFixed(1)} je 100 Wörter`,
+				nebenwert: `${streckverbBefunde.length} Streckverben darunter`,
+				status: "neutral",
+				sicherheit: "mittel",
+				tooltip:
+					"Substantivierungen (Suffixe wie -ung, -heit, -tion) plus Streckverben (\"zur Anwendung kommen\") je 100 Wörter. " +
+					"Sicherheit hängt an der Ausnahmeliste für echte Substantive.",
+			},
+			{
+				id: "perfekt",
+				label: "Perfekt",
+				wert: proHundertWoerter(perfektBefunde.length),
+				anzeige: `${proHundertWoerter(perfektBefunde.length).toFixed(1)} je 100 Wörter`,
+				status: "neutral",
+				sicherheit: "mittel",
+				tooltip:
+					"haben/sein + Partizip II im selben Satz, Abstand ≤ 12 Token. Informationswert, kein Zielprofil-Bezug im Konzept. " +
+					"Partizip-II-Erkennung ist ohne Lexikon heuristisch.",
 			}
 		);
 	}

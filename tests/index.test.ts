@@ -15,18 +15,36 @@ describe("analysiere (Fundament M1 + Kennzahlen M2)", () => {
 		expect(ergebnis.dauerMs).toBeGreaterThanOrEqual(0);
 	});
 
-	it("berechnet die Kennzahlen aus M2 für deutschen Text mit Sätzen", () => {
+	it("berechnet die Kennzahlen aus M2+M3 für deutschen Text mit Sätzen", () => {
 		const text =
 			"Die Universität Halle hat heute eine neue Studie zur Landwirtschaft veröffentlicht. Die Ergebnisse überraschen viele Fachleute in der Region.";
 		const ergebnis = analysiere(text);
 
 		const ids = ergebnis.kennzahlen.map((k) => k.id);
 		expect(ids).toEqual(
-			expect.arrayContaining(["schulstufe", "lix", "satzlaenge-mittel", "lange-saetze", "rhythmus", "fachbegriffe"])
+			expect.arrayContaining([
+				"schulstufe", "lix", "satzlaenge-mittel", "lange-saetze", "rhythmus",
+				"fachbegriffe", "fuellwoerter", "nominalstil", "perfekt",
+			])
 		);
 		for (const k of ergebnis.kennzahlen) {
 			expect(k.status).toBe("neutral"); // Zielprofile kommen erst mit M7
 			expect(typeof k.anzeige).toBe("string");
+		}
+	});
+
+	it("liefert Stilmarker-Befunde (Füllwörter, Perfekt, Nominalstil, Streckverben) mit Fundstelle", () => {
+		const text =
+			"Die Untersuchung hat eigentlich gezeigt, dass die Methode zur Anwendung kommen sollte.";
+		const ergebnis = analysiere(text);
+
+		const kategorien = new Set(ergebnis.befunde.map((b) => b.kategorie));
+		expect(kategorien.has("fuellwort")).toBe(true);
+		expect(kategorien.has("perfekt")).toBe(true);
+		expect(kategorien.has("nominalstil")).toBe(true);
+		expect(kategorien.has("streckverb")).toBe(true);
+		for (const b of ergebnis.befunde) {
+			expect(text.slice(b.von, b.bis)).toBe(b.text);
 		}
 	});
 
