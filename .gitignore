@@ -1,0 +1,10 @@
+node_modules/
+main.js
+*.js.map
+.DS_Store
+dist/
+coverage/
+
+# Rohdaten Dritter, nicht redistributionsfähig (siehe src/data/derewo-LICENSE.txt).
+# Nur das aufbereitete Ergebnis (src/data/derewo-top20k.json) gehört ins Repo.
+scripts/derewo-quelle/
