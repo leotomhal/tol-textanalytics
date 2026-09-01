@@ -17,6 +17,7 @@
  */
 
 import type { Befund, Ergebnis, Kategorie } from "../analyse/types";
+import { KATEGORIE_META, KENNZAHL_GRUPPEN } from "./kategorien";
 
 export interface PanelOptionen {
 	/** Ersetzt die normale Anzeige durch einen Hinweistext (z. B. "Keine Notiz geöffnet"). */
@@ -40,21 +41,6 @@ export interface PanelOptionen {
 	/** Gegenrichtung: Wort trotz Bekanntheit künftig immer als selten markieren. */
 	aufWortImmerMarkieren?: (wort: string) => void;
 }
-
-const KATEGORIE_LABELS: Record<Kategorie, string> = {
-	"langer-satz": "Lange Sätze",
-	"sehr-langer-satz": "Sehr lange Sätze",
-	"gleichfoermige-passage": "Gleichförmige Passagen",
-	passiv: "Passiv",
-	zustandspassiv: "Zustandspassiv",
-	perfekt: "Perfekt",
-	fuellwort: "Füllwörter",
-	nominalstil: "Nominalstil",
-	streckverb: "Streckverben",
-	"seltenes-wort": "Seltene Wörter",
-	wortwiederholung: "Wortwiederholungen",
-	abkuerzung: "Abkürzungen",
-};
 
 const MAX_SELTENE_WOERTER_ANZEIGE = 20;
 
@@ -94,7 +80,6 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 function baueKennzahlZeile(k: Ergebnis["kennzahlen"][number]): HTMLElement {
 	const zeile = el("div", ["textanalyse-kennzahl", `textanalyse-status-${k.status}`]);
-	zeile.title = k.tooltip;
 
 	const kopf = el("div", ["textanalyse-kennzahl-kopf"]);
 	kopf.appendChild(el("span", ["textanalyse-kennzahl-label"], k.label));
@@ -105,7 +90,23 @@ function baueKennzahlZeile(k: Ergebnis["kennzahlen"][number]): HTMLElement {
 		zeile.appendChild(el("div", ["textanalyse-kennzahl-neben"], k.nebenwert));
 	}
 
+	// Baustein F: statt nur als Hover-Titel ist die Erklärung jetzt immer
+	// sichtbar — im Wortliga-Vergleich fehlte genau das ("was bedeutet das?").
+	if (k.tooltip) {
+		zeile.appendChild(el("div", ["textanalyse-kennzahl-tooltip"], k.tooltip));
+	}
+
 	return zeile;
+}
+
+function baueKennzahlGruppe(titel: string, kennzahlen: Ergebnis["kennzahlen"]): HTMLElement | null {
+	if (kennzahlen.length === 0) return null;
+	const gruppe = el("div", ["textanalyse-kennzahl-gruppe"]);
+	gruppe.appendChild(el("div", ["textanalyse-kennzahl-gruppentitel"], titel));
+	for (const k of kennzahlen) {
+		gruppe.appendChild(baueKennzahlZeile(k));
+	}
+	return gruppe;
 }
 
 function baueChecklistenZeile(
@@ -113,8 +114,22 @@ function baueChecklistenZeile(
 	anzahl: number,
 	optionen: PanelOptionen
 ): HTMLElement {
+	const meta = KATEGORIE_META[kategorie];
 	const zeile = el("div", ["textanalyse-checkliste-zeile"]);
-	const label = el("span", ["textanalyse-checkliste-label"], KATEGORIE_LABELS[kategorie]);
+
+	// Baustein B: Farbpunkt in derselben Farbe wie die Markierung im Editor
+	// (kategorien.ts ist die einzige Quelle für beide). Vorher fehlte jeder
+	// visuelle Bezug zwischen Checkliste und Text.
+	const links = el("span", ["textanalyse-checkliste-links"]);
+	const punkt = el("span", ["textanalyse-farbpunkt"]);
+	punkt.style.setProperty("--textanalyse-farbpunkt-farbe", `hsl(var(${meta.farbeHsl}))`);
+	links.appendChild(punkt);
+	const textSpalte = el("span", ["textanalyse-checkliste-text"]);
+	textSpalte.appendChild(el("span", ["textanalyse-checkliste-label"], meta.label));
+	// Baustein D: kurze, immer sichtbare Erklärung statt bloßem Kategorienamen.
+	textSpalte.appendChild(el("span", ["textanalyse-checkliste-erklaerung"], meta.kurzerklaerung));
+	links.appendChild(textSpalte);
+
 	const rechts = el("span", ["textanalyse-checkliste-rechts"]);
 
 	if (optionen.aufSichtbarkeitToggle) {
@@ -123,7 +138,7 @@ function baueChecklistenZeile(
 		schalter.type = "button";
 		schalter.setAttribute(
 			"aria-label",
-			`Markierung ${sichtbar ? "ausblenden" : "einblenden"}: ${KATEGORIE_LABELS[kategorie]}`
+			`Markierung ${sichtbar ? "ausblenden" : "einblenden"}: ${meta.label}`
 		);
 		schalter.title = sichtbar ? "Markierung im Editor ausblenden" : "Markierung im Editor einblenden";
 		schalter.addEventListener("click", (ev) => {
@@ -136,7 +151,7 @@ function baueChecklistenZeile(
 	if (optionen.aufNavigiere) {
 		const zurueck = el("button", ["textanalyse-nav-button"], "‹");
 		zurueck.type = "button";
-		zurueck.setAttribute("aria-label", `Vorherige Fundstelle: ${KATEGORIE_LABELS[kategorie]}`);
+		zurueck.setAttribute("aria-label", `Vorherige Fundstelle: ${meta.label}`);
 		zurueck.addEventListener("click", (ev) => {
 			ev.stopPropagation();
 			optionen.aufNavigiere?.(kategorie, "zurueck");
@@ -149,7 +164,7 @@ function baueChecklistenZeile(
 	if (optionen.aufNavigiere) {
 		const vor = el("button", ["textanalyse-nav-button"], "›");
 		vor.type = "button";
-		vor.setAttribute("aria-label", `Nächste Fundstelle: ${KATEGORIE_LABELS[kategorie]}`);
+		vor.setAttribute("aria-label", `Nächste Fundstelle: ${meta.label}`);
 		vor.addEventListener("click", (ev) => {
 			ev.stopPropagation();
 			optionen.aufNavigiere?.(kategorie, "vor");
@@ -157,7 +172,7 @@ function baueChecklistenZeile(
 		rechts.appendChild(vor);
 	}
 
-	zeile.appendChild(label);
+	zeile.appendChild(links);
 	zeile.appendChild(rechts);
 
 	if (optionen.aufErsteFundstelle) {
@@ -178,7 +193,10 @@ function gruppiereBefunde(befunde: Befund[]): Map<Kategorie, number> {
 
 function baueChecklistenContainer(befunde: Befund[], optionen: PanelOptionen): HTMLElement {
 	const checkliste = el("div", ["textanalyse-checkliste"]);
-	for (const [kategorie, anzahl] of gruppiereBefunde(befunde)) {
+	// Baustein D: häufigste Kategorie zuerst statt Reihenfolge des ersten
+	// Auftretens im Text — die dringendsten Probleme stehen so oben.
+	const sortiert = Array.from(gruppiereBefunde(befunde)).sort(([, a], [, b]) => b - a);
+	for (const [kategorie, anzahl] of sortiert) {
 		checkliste.appendChild(baueChecklistenZeile(kategorie, anzahl, optionen));
 	}
 	return checkliste;
@@ -281,10 +299,22 @@ export function rendereePanel(container: HTMLElement, ergebnis: Ergebnis | null,
 		)
 	);
 
+	// Baustein E: statt einer flachen 9er-Liste in Gruppen (Verständlichkeit /
+	// Satzbau / Stil) — die Wortliga-Kritik war "unverständlich, keine Struktur".
 	const kennzahlenContainer = el("div", ["textanalyse-kennzahlen"]);
-	for (const k of ergebnis.kennzahlen) {
-		kennzahlenContainer.appendChild(baueKennzahlZeile(k));
+	const zugeordnet = new Set<string>();
+	for (const gruppe of KENNZAHL_GRUPPEN) {
+		const kennzahlenDerGruppe = ergebnis.kennzahlen.filter((k) => gruppe.kennzahlIds.includes(k.id));
+		for (const k of kennzahlenDerGruppe) zugeordnet.add(k.id);
+		const gruppenElement = baueKennzahlGruppe(gruppe.titel, kennzahlenDerGruppe);
+		if (gruppenElement) kennzahlenContainer.appendChild(gruppenElement);
 	}
+	// Kennzahlen, die keiner Gruppe zugeordnet sind (z. B. künftig neu
+	// hinzugefügte), fallen nicht unter den Tisch, sondern landen ungruppiert
+	// am Ende.
+	const uebrige = ergebnis.kennzahlen.filter((k) => !zugeordnet.has(k.id));
+	const uebrigeElement = baueKennzahlGruppe("Weitere Kennzahlen", uebrige);
+	if (uebrigeElement) kennzahlenContainer.appendChild(uebrigeElement);
 	container.appendChild(kennzahlenContainer);
 
 	container.appendChild(baueChecklistenContainer(ergebnis.befunde, optionen));

@@ -47,6 +47,30 @@ describe("baueDecorations", () => {
 		});
 		expect(anzahl).toBe(1);
 	});
+
+	it("gibt jeder Decoration einen Hover-Titel mit Kategorie und Erklärung (Konzept-Feedback: 'fehlt jeglicher Hinweis')", () => {
+		const befunde = [befund("fuellwort", 0, 5)];
+		const set = baueDecorations(befunde, new Set(ALLE_KATEGORIEN), 20);
+
+		const titel: string[] = [];
+		set.between(0, 20, (_from, _to, deco) => {
+			titel.push((deco.spec as { attributes: { title: string } }).attributes.title);
+		});
+		expect(titel).toHaveLength(1);
+		expect(titel[0]).toContain("Füllwörter");
+		expect(titel[0].length).toBeGreaterThan("Füllwörter".length);
+	});
+
+	it("nutzt den individuellen Hinweis des Befunds im Hover-Titel, falls vorhanden", () => {
+		const b: Befund = { ...befund("fuellwort", 0, 5), hinweis: "Individueller Hinweis" };
+		const set = baueDecorations([b], new Set(ALLE_KATEGORIEN), 20);
+
+		let titel = "";
+		set.between(0, 20, (_from, _to, deco) => {
+			titel = (deco.spec as { attributes: { title: string } }).attributes.title;
+		});
+		expect(titel).toBe("Füllwörter: Individueller Hinweis");
+	});
 });
 
 describe("textanalyseFeld", () => {

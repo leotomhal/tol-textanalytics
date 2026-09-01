@@ -27,8 +27,25 @@
 .textanalyse-kennzahlen {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 12px;
 	margin-bottom: 12px;
+}
+
+/* Baustein E: Gruppierung der Kennzahlen (Verständlichkeit / Satzbau / Stil)
+   statt einer flachen Liste ohne erkennbare Struktur. */
+.textanalyse-kennzahl-gruppe {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.textanalyse-kennzahl-gruppentitel {
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-medium);
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	color: var(--text-muted);
+	margin-bottom: 2px;
 }
 
 .textanalyse-kennzahl {
@@ -66,10 +83,18 @@
 	color: var(--text-muted);
 }
 
+/* Baustein F: Erklärung immer sichtbar statt nur als Hover-Titel — im
+   Wortliga-Vergleich blieb sonst unklar, was ein Wert überhaupt bedeutet. */
+.textanalyse-kennzahl-tooltip {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	margin-top: 2px;
+}
+
 .textanalyse-checkliste {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
+	gap: 6px;
 	border-top: 1px solid var(--background-modifier-border);
 	padding-top: 8px;
 }
@@ -77,9 +102,48 @@
 .textanalyse-checkliste-zeile {
 	display: flex;
 	justify-content: space-between;
-	align-items: center;
+	align-items: flex-start;
 	padding: 2px 4px;
 	border-radius: var(--radius-s);
+}
+
+.textanalyse-checkliste-links {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	min-width: 0;
+}
+
+/* Baustein B: Farbpunkt in derselben Farbe wie die Markierung im Editor —
+   stellt den fehlenden visuellen Bezug zwischen Checkliste und Text her.
+   Farbe kommt pro Zeile über eine Inline-Custom-Property aus kategorien.ts. */
+.textanalyse-farbpunkt {
+	width: 10px;
+	height: 10px;
+	min-width: 10px;
+	border-radius: 50%;
+	margin-top: 4px;
+	background: var(--textanalyse-farbpunkt-farbe, var(--background-modifier-border));
+}
+
+.textanalyse-checkliste-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+/* Baustein D: kurze, immer sichtbare Erklärung statt bloßem Kategorienamen. */
+.textanalyse-checkliste-erklaerung {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.textanalyse-checkliste-rechts {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex: none;
+	margin-top: 2px;
 }
 
 .textanalyse-checkliste-klickbar {
@@ -87,12 +151,6 @@
 }
 .textanalyse-checkliste-klickbar:hover {
 	background: var(--background-modifier-hover);
-}
-
-.textanalyse-checkliste-rechts {
-	display: flex;
-	align-items: center;
-	gap: 4px;
 }
 
 .textanalyse-checkliste-anzahl {

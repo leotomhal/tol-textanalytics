@@ -181,6 +181,63 @@ describe("rendereePanel", () => {
 		expect(eingabe).not.toBeNull();
 		expect(button).not.toBeNull();
 	});
+
+	it("zeigt in jeder Checklistenzeile einen Farbpunkt und eine Kurzerklärung (Konzept-Feedback)", () => {
+		const container = document.createElement("div");
+		const ergebnis = analysiere("Das ist eigentlich ganz einfach und wirklich eigentlich klar.");
+		rendereePanel(container, ergebnis);
+
+		const zeile = container.querySelector(".textanalyse-checkliste-zeile") as HTMLElement;
+		expect(zeile).not.toBeNull();
+		const punkt = zeile.querySelector(".textanalyse-farbpunkt") as HTMLElement;
+		expect(punkt).not.toBeNull();
+		expect(punkt.style.getPropertyValue("--textanalyse-farbpunkt-farbe")).toContain("--color-blue-hsl");
+		expect(zeile.querySelector(".textanalyse-checkliste-erklaerung")?.textContent).toBeTruthy();
+	});
+
+	it("sortiert die Checkliste nach Häufigkeit absteigend", () => {
+		const container = document.createElement("div");
+		// "eigentlich" (Füllwort) kommt zweimal vor, "wirklich" (Füllwort) einmal —
+		// beide zusammen sollten aber häufiger sein als eine seltene Einzelkategorie.
+		const ergebnis = analysiere(
+			"Das ist eigentlich ganz einfach und wirklich eigentlich klar, wobei die Untersuchung zur Anwendung kommen sollte."
+		);
+		rendereePanel(container, ergebnis);
+
+		const anzahlen = Array.from(container.querySelectorAll(".textanalyse-checkliste-anzahl")).map((el) =>
+			Number(el.textContent)
+		);
+		const sortiert = [...anzahlen].sort((a, b) => b - a);
+		expect(anzahlen).toEqual(sortiert);
+	});
+
+	it("gruppiert die Kennzahlen unter Gruppentiteln statt einer flachen Liste", () => {
+		const container = document.createElement("div");
+		const ergebnis = analysiere(
+			"Die Untersuchung hat eigentlich gezeigt, dass die Methode zur Anwendung kommen sollte."
+		);
+		rendereePanel(container, ergebnis);
+
+		const gruppentitel = Array.from(container.querySelectorAll(".textanalyse-kennzahl-gruppentitel")).map(
+			(el) => el.textContent
+		);
+		expect(gruppentitel).toEqual(expect.arrayContaining(["Verständlichkeit", "Satzbau", "Stil"]));
+
+		const kennzahlZeilen = container.querySelectorAll(".textanalyse-kennzahl");
+		expect(kennzahlZeilen.length).toBe(ergebnis.kennzahlen.length);
+	});
+
+	it("zeigt die Kennzahl-Erklärung immer sichtbar statt nur als Hover-Titel", () => {
+		const container = document.createElement("div");
+		const ergebnis = analysiere(
+			"Die Untersuchung hat eigentlich gezeigt, dass die Methode zur Anwendung kommen sollte."
+		);
+		rendereePanel(container, ergebnis);
+
+		const tooltipZeile = container.querySelector(".textanalyse-kennzahl-tooltip");
+		expect(tooltipZeile).not.toBeNull();
+		expect(tooltipZeile?.textContent?.length).toBeGreaterThan(0);
+	});
 });
 
 describe("distinkteSelteneWoerter", () => {
