@@ -23,6 +23,73 @@ const FUELLWOERTER = [
   "nichtsdestotrotz","dennoch","trotzdem","jedoch","wobei","woraufhin"
 ];
 
+// Stoppwörter für die Wortwiederholungs-Prüfung: Artikel, Pronomen,
+// Präpositionen, Konjunktionen, Hilfs-/Modalverben. Wiederholen sich in
+// jedem Text ständig und wären kein Stilproblem, sondern normale Grammatik.
+const STOPWOERTER_WIEDERHOLUNG = new Set([
+  // Artikel/Determinative
+  "der","die","das","den","dem","des","ein","eine","einen","einem","einer","eines",
+  "kein","keine","keinen","keinem","keiner","keines",
+  "dieser","diese","dieses","diesen","diesem",
+  "jener","jene","jenes","jenen","jenem",
+  "jeder","jede","jedes","jeden","jedem",
+  "mancher","manche","manches","manchen","manchem",
+  "solcher","solche","solches","solchen","solchem",
+  "alle","aller","alles","allen","allem",
+  // Personal-/Possessivpronomen
+  "ich","du","er","sie","es","wir","ihr",
+  "mich","dich","ihn","uns","euch","ihnen","ihm","ihr",
+  "mein","meine","meinen","meinem","meiner","meines",
+  "dein","deine","deinen","deinem","deiner","deines",
+  "sein","seine","seinen","seinem","seiner","seines",
+  "unser","unsere","unseren","unserem","unserer","unseres",
+  "euer","eure","euren","eurem","eurer","eures",
+  "man","wer","was","wen","wem","wessen",
+  // Präpositionen
+  "in","an","auf","für","von","mit","nach","bei","aus","zu","über","unter",
+  "durch","gegen","ohne","um","seit","bis","während","wegen","trotz","statt",
+  "innerhalb","außerhalb","zwischen","neben","hinter","vor","um",
+  // Konjunktionen
+  "und","oder","aber","doch","denn","sondern","weil","dass","wenn","als",
+  "wie","damit","obwohl","während","bevor","nachdem","sobald","falls",
+  // Hilfs-/Modalverben (häufige Formen)
+  "ist","sind","war","waren","wird","werden","wurde","wurden",
+  "hat","haben","hatte","hatten",
+  "kann","können","konnte","konnten",
+  "muss","müssen","musste","mussten",
+  "soll","sollen","sollte","sollten",
+  "will","wollen","wollte","wollten",
+  "darf","dürfen","durfte","durften",
+  "mag","mögen","möchte","möchten",
+  // Sonstige sehr häufige Funktionswörter
+  "nicht","es","so","dann","dort","hier","da",
+]);
+
+// Ausnahmeliste (Konzept-Feedback): Institutions-/Fachbegriffe, die sich in
+// Pressetexten absichtlich und legitim wiederholen (Institutsname, Titel
+// usw.) — analog zu FUELLWOERTER als feste, bei Bedarf erweiterbare Liste.
+const EIGENNAMEN_AUSNAHMEN_WIEDERHOLUNG = new Set([
+  "mlu","universität","universitaet","institut","instituts","fakultät","fakultaet",
+  "professor","professorin","professoren","professorinnen",
+  "doktor","studie","studien","forschung","forscher","forscherin",
+  "forscherinnen","forschern","wissenschaftler","wissenschaftlerin",
+  "wissenschaftlerinnen","wissenschaftlern","halle","wittenberg",
+]);
+
+const WIEDERHOLUNG_MIN_WORTLAENGE = 4;
+// Abstand in Wörtern, ab dem zwei Vorkommen desselben Wortes nicht mehr als
+// Wiederholung gelten (Konzept-Feedback: ~50 Wörter ≈ 2–3 Sätze).
+const WIEDERHOLUNG_SCHWELLE = 50;
+
+function istRelevantesInhaltswortFuerWiederholung(wortLower) {
+  if (wortLower.length < WIEDERHOLUNG_MIN_WORTLAENGE) return false;
+  if (/^\d+$/.test(wortLower)) return false;
+  if (STOPWOERTER_WIEDERHOLUNG.has(wortLower)) return false;
+  if (FUELLWOERTER.includes(wortLower)) return false;
+  if (EIGENNAMEN_AUSNAHMEN_WIEDERHOLUNG.has(wortLower)) return false;
+  return true;
+}
+
 // Normales Passiv: Hilfsverb + Partizip II
 // z.B. "wird geprüft", "wurde beschlossen", "werden berücksichtigt"
 const PASSIV_REGEX = /\b(wird|werden|wurde|wurden|worden|worden\s+ist|worden\s+sind|worden\s+war|worden\s+waren)\s+\w*(ge\w+(t|en)|[\w]+t|[\w]+en)\b/gi;
@@ -189,10 +256,11 @@ function maskiereMarkdown(text) {
 // KATEGORIE-DEFINITION
 // ─────────────────────────────────────────────
 const KATEGORIEN = [
-  { id: "lang_satz",    label: "Lange Sätze (>25 W.)",  farbe: "#FFA000", cls: "cm-lesbarkeit-lang-satz" },
-  { id: "passiv",       label: "Passiv",                farbe: "#FDD835", cls: "cm-lesbarkeit-passiv" },
-  { id: "fuell",        label: "Füllwörter",            farbe: "#2196F3", cls: "cm-lesbarkeit-fuell" },
-  { id: "melodie",      label: "Monotone Satzlänge",    farbe: "#E91E63", cls: "cm-lesbarkeit-melodie" },
+  { id: "lang_satz",     label: "Lange Sätze (>25 W.)",   farbe: "#FFA000", cls: "cm-lesbarkeit-lang-satz" },
+  { id: "passiv",        label: "Passiv",                 farbe: "#FDD835", cls: "cm-lesbarkeit-passiv" },
+  { id: "fuell",         label: "Füllwörter",              farbe: "#2196F3", cls: "cm-lesbarkeit-fuell" },
+  { id: "wiederholung",  label: "Wortwiederholungen",     farbe: "#00BCD4", cls: "cm-lesbarkeit-wiederholung" },
+  { id: "melodie",       label: "Monotone Satzlänge",     farbe: "#E91E63", cls: "cm-lesbarkeit-melodie" },
 ];
 
 // ─────────────────────────────────────────────
@@ -315,7 +383,35 @@ function analysiereText(originalText) {
     }
   }
 
-  // ── 4. Sprachmelodie ──
+  // ── 4. Wortwiederholungen ──
+  // Inhaltswort (kein Artikel/Pronomen/Präposition/Konjunktion/Hilfsverb,
+  // keine Institutions-Ausnahme, mind. 4 Buchstaben) taucht innerhalb von
+  // WIEDERHOLUNG_SCHWELLE Wörtern erneut auf. Abstand wird über alle
+  // Wörter gezählt (nicht nur Inhaltswörter), damit er dem gefühlten
+  // Leseabstand entspricht. Nur das jeweils erneute Vorkommen wird
+  // markiert, das erste (unauffällige) nicht.
+  {
+    const letztesVorkommen = new Map(); // Wort (klein) -> laufender Wortindex beim letzten Vorkommen
+    let wortIndex = 0;
+    reset(RE_WORT);
+    let wm;
+    while ((wm = RE_WORT.exec(text)) !== null) {
+      wortIndex++;
+      const wortLower = wm[0].toLowerCase();
+      if (!istRelevantesInhaltswortFuerWiederholung(wortLower)) continue;
+      const letzterIndex = letztesVorkommen.get(wortLower);
+      if (letzterIndex !== undefined && wortIndex - letzterIndex <= WIEDERHOLUNG_SCHWELLE) {
+        addMark(
+          wm.index, wm.index + wm[0].length,
+          "wiederholung", "cm-lesbarkeit-wiederholung",
+          `Wortwiederholung: „${wm[0]}" (${wortIndex - letzterIndex} Wörter zuvor)`
+        );
+      }
+      letztesVorkommen.set(wortLower, wortIndex);
+    }
+  }
+
+  // ── 5. Sprachmelodie ──
   // Absätze mit geringer Satzlängenvariation (stddev < 4) hervorheben
   const melodieErgebnis = berechneSprachmelodie(text);
   ergebnis.melodie = melodieErgebnis.score;
