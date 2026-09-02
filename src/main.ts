@@ -309,20 +309,33 @@ export default class TextanalysePlugin extends Plugin {
 	/** Aktualisiert die Editor-Markierungen (Konzept 2.4) — läuft unabhängig vom Panel, eigene Verzögerung. */
 	private aktualisiereDecorations(): void {
 		const markdownView = this.aktiveOderLetzteMarkdownView();
-		if (!markdownView) return;
+		if (!markdownView) {
+			console.debug("[Textanalyse] aktualisiereDecorations: keine MarkdownView gefunden — Abbruch.");
+			return;
+		}
 
 		const editor = markdownView.editor;
 		const cm = holeEditorView(editor);
-		if (!cm) return; // z. B. Reading-Ansicht ohne CM6-Instanz — keine Markierung möglich.
+		if (!cm) {
+			// z. B. Reading-Ansicht ohne CM6-Instanz — keine Markierung möglich.
+			console.debug("[Textanalyse] aktualisiereDecorations: kein CM6-EditorView (editor.cm) gefunden — Abbruch.");
+			return;
+		}
 
 		const text = editor.getValue();
-		if (this.istZuGrossFuerLiveAnalyse(text)) return; // keine Live-Markierungen für riesige Notizen.
+		if (this.istZuGrossFuerLiveAnalyse(text)) {
+			console.debug("[Textanalyse] aktualisiereDecorations: Notiz zu groß für Live-Markierungen — Abbruch.");
+			return; // keine Live-Markierungen für riesige Notizen.
+		}
 
 		const cursorOffset = editor.posToOffset(editor.getCursor());
 		const ergebnis = analysiere(text, this.analyseOptionen(cursorOffset));
 		this.letztesErgebnis = ergebnis;
 		this.merkeStatus(ergebnis);
 
+		console.debug(
+			`[Textanalyse] aktualisiereDecorations: dispatch mit ${ergebnis.befunde.length} Befunden, sichtbare Kategorien: ${this.sichtbareKategorien.size}.`
+		);
 		cm.dispatch({ effects: setzeBefunde.of(ergebnis.befunde) });
 	}
 
@@ -380,12 +393,21 @@ export default class TextanalysePlugin extends Plugin {
 	/** Klick auf Checklistenzeile ("erste") bzw. ‹/›-Navigation (Konzept, Abschnitt 6). */
 	private springeZuFundstelle(kategorie: Kategorie, richtung: "erste" | "vor" | "zurueck"): void {
 		const markdownView = this.aktiveOderLetzteMarkdownView();
-		if (!markdownView || !this.letztesErgebnis) return;
+		if (!markdownView || !this.letztesErgebnis) {
+			console.debug(
+				`[Textanalyse] springeZuFundstelle(${kategorie}, ${richtung}): markdownView=${!!markdownView}, letztesErgebnis=${!!this.letztesErgebnis} — Abbruch.`
+			);
+			return;
+		}
 
 		const treffer: Befund[] = this.letztesErgebnis.befunde
 			.filter((b) => b.kategorie === kategorie)
 			.sort((a, b) => a.von - b.von);
-		if (treffer.length === 0) return;
+		if (treffer.length === 0) {
+			console.debug(`[Textanalyse] springeZuFundstelle(${kategorie}, ${richtung}): keine Treffer — Abbruch.`);
+			return;
+		}
+		console.debug(`[Textanalyse] springeZuFundstelle(${kategorie}, ${richtung}): ${treffer.length} Treffer.`);
 
 		const editor = markdownView.editor;
 		let ziel: Befund;
@@ -403,8 +425,12 @@ export default class TextanalysePlugin extends Plugin {
 
 		const von = editor.offsetToPos(ziel.von);
 		const bis = editor.offsetToPos(ziel.bis);
+		console.debug(
+			`[Textanalyse] springeZuFundstelle: springe zu Offset ${ziel.von}-${ziel.bis} (Zeile ${von.line}:${von.ch}), Text: "${ziel.text}".`
+		);
 		editor.setSelection(von, bis);
 		editor.scrollIntoView({ from: von, to: bis }, true);
+		editor.focus();
 	}
 
 	/** Für Settings.ts: Ignorierliste als Zeilen lesen/schreiben (Konzept 3.5, "in den Settings einsehbar und editierbar"). */
