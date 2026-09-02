@@ -175,28 +175,12 @@ function maskiereMarkdown(text) {
   // 8. HTML-Kommentare
   mask(/<!--[\s\S]*?-->/g);
 
-  // 9. Überschriften: `#`-Marker maskieren, Zeilenende mit virtuellem Punkt versehen,
-  //    damit die Überschrift als eigener Satz erkannt wird.
-  //    Original-Länge muss erhalten bleiben.
-  m = m.replace(/^(#{1,6})(\s+)([^\n]+?)(\s*)$/gm, (match, hashes, sp1, inhalt, sp2) => {
-    // Hashes und führende Leerzeichen durch Leerzeichen ersetzen
-    const prefix = " ".repeat(hashes.length + sp1.length);
-    // Hat die Überschrift schon ein Satzendzeichen?
-    if (/[.!?…:]$/.test(inhalt)) {
-      // Schon vorhanden – nur Hashes maskieren
-      return prefix + inhalt + sp2;
-    }
-    // Letztes Zeichen durch '.' ersetzen, damit Länge gleich bleibt
-    // Falls der Inhalt mit einem Leerzeichen/Sonderzeichen endet, einfach Punkt anhängen
-    // (passiert selten, weil wir bereits getrimmt haben)
-    const inhaltMitPunkt = inhalt.slice(0, -1) + (inhalt.slice(-1).match(/\w/) ? inhalt.slice(-1) + "" : inhalt.slice(-1));
-    // Einfacher Ansatz: letztes Wortzeichen lassen, dahinter Punkt fügen wir per sp2 hinzu
-    if (sp2.length >= 1) {
-      return prefix + inhalt + "." + sp2.slice(1);
-    }
-    // sp2 ist leer: dann das letzte Zeichen ersetzen (selten, weil meist \n folgt)
-    return prefix + inhalt.slice(0, -1) + ".";
-  });
+  // 9. Überschriften (#…######) komplett maskieren, wie Frontmatter oder
+  //    Codeblöcke: keine eigenständigen Sätze, folgen anderen Konventionen
+  //    (oft Nominalstil, keine Verben, bewusst kurz/prägnant) — Füllwort-,
+  //    Passiv- und Lange-Sätze-Prüfung sowie die Wort-/Satzstatistiken
+  //    ergäben dort keinen Sinn.
+  mask(/^#{1,6}[ \t]+[^\n]*$/gm);
 
   return m;
 }
@@ -238,6 +222,18 @@ class LesbarkeitSettingTab extends PluginSettingTab {
 // ─────────────────────────────────────────────
 const RE_SATZ = /[^.!?…:]+[.!?…:]+/g;
 const RE_WORT = /\b\w+\b/g;
+
+// Zuschreibungs-Nachsatz bei Zitaten, z. B.:
+// „Das ist ein Statement.", sagt Prof. Dr. Mario Mustermann vom Institut
+// für Chemie der MLU.
+// Grammatikalisch ein Satz, inhaltlich zwei Einheiten: das Zitat (ein
+// abgeschlossener Gedanke) plus die angehängte Quellenangabe. Die
+// Quellenangabe zieht den Wortzähler für "Lange Sätze" oft über die
+// Schwelle, obwohl sie den Satz nicht schwerer lesbar macht. Wird beim
+// Zählen (nicht bei der Markierung selbst) ignoriert, wenn sie am Satzende
+// direkt auf ein schließendes Anführungszeichen folgt.
+const ZITAT_ZUSCHREIBUNG_REGEX =
+  /["""»]\s*,?\s*(?:so|sagt|sagte|erklärt|erklärte|meint|meinte|betont|betonte|ergänzt|ergänzte|resümiert|resümierte|kommentiert|kommentierte|berichtet|berichtete|führt\s+\w+\s+aus|führte\s+\w+\s+aus|fügt\s+\w+\s+hinzu|fügte\s+\w+\s+hinzu)\b[^.!?…:]*[.!?…:]?\s*$/i;
 
 // ─────────────────────────────────────────────
 // ANALYSE-ENGINE
@@ -289,7 +285,10 @@ function analysiereText(originalText) {
   reset(RE_SATZ);
   while ((m = RE_SATZ.exec(text)) !== null) {
     const satz = m[0];
-    const wCount = (satz.match(RE_WORT) || []).length;
+    // Zuschreibungs-Nachsatz bei Zitaten für die Zählung ignorieren (s. o.) —
+    // die Markierung selbst deckt bei Auslösung trotzdem den ganzen Satz ab.
+    const satzOhneZuschreibung = satz.replace(ZITAT_ZUSCHREIBUNG_REGEX, "");
+    const wCount = (satzOhneZuschreibung.match(RE_WORT) || []).length;
     if (wCount > 25) {
       const cls = wCount > 35 ? "cm-lesbarkeit-sehr-lang-satz" : "cm-lesbarkeit-lang-satz";
       addMark(m.index, m.index + satz.length, "lang_satz", cls, `Langer Satz: ${wCount} Wörter`);
