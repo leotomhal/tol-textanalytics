@@ -1,0 +1,38 @@
+name: Release
+
+# Läuft, wenn ein Versions-Tag gepusht wird (z.B. "1.0.1", passend zu
+# manifest.json/versions.json – ohne "v"-Präfix, wie von BRAT erwartet).
+# Legt ein GitHub-Release mit main.js, manifest.json und styles.css als
+# Assets an, damit BRAT das Plugin findet.
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prüfen, dass Tag zur manifest.json-Version passt
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          version=$(jq -r .version manifest.json)
+          if [ "$tag" != "$version" ]; then
+            echo "Tag ($tag) und manifest.json-Version ($version) weichen voneinander ab." >&2
+            exit 1
+          fi
+
+      - name: Release erstellen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          gh release create "$tag" \
+            --title "$tag" \
+            --notes "Release $tag" \
+            main.js manifest.json styles.css
