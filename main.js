@@ -239,6 +239,18 @@ class LesbarkeitSettingTab extends PluginSettingTab {
 const RE_SATZ = /[^.!?…:]+[.!?…:]+/g;
 const RE_WORT = /\b\w+\b/g;
 
+// Zuschreibungs-Nachsatz bei Zitaten, z. B.:
+// „Das ist ein Statement.", sagt Prof. Dr. Mario Mustermann vom Institut
+// für Chemie der MLU.
+// Grammatikalisch ein Satz, inhaltlich zwei Einheiten: das Zitat (ein
+// abgeschlossener Gedanke) plus die angehängte Quellenangabe. Die
+// Quellenangabe zieht den Wortzähler für "Lange Sätze" oft über die
+// Schwelle, obwohl sie den Satz nicht schwerer lesbar macht. Wird beim
+// Zählen (nicht bei der Markierung selbst) ignoriert, wenn sie am Satzende
+// direkt auf ein schließendes Anführungszeichen folgt.
+const ZITAT_ZUSCHREIBUNG_REGEX =
+  /["""»]\s*,?\s*(?:so|sagt|sagte|erklärt|erklärte|meint|meinte|betont|betonte|ergänzt|ergänzte|resümiert|resümierte|kommentiert|kommentierte|berichtet|berichtete|führt\s+\w+\s+aus|führte\s+\w+\s+aus|fügt\s+\w+\s+hinzu|fügte\s+\w+\s+hinzu)\b[^.!?…:]*[.!?…:]?\s*$/i;
+
 // ─────────────────────────────────────────────
 // ANALYSE-ENGINE
 // ─────────────────────────────────────────────
@@ -289,7 +301,10 @@ function analysiereText(originalText) {
   reset(RE_SATZ);
   while ((m = RE_SATZ.exec(text)) !== null) {
     const satz = m[0];
-    const wCount = (satz.match(RE_WORT) || []).length;
+    // Zuschreibungs-Nachsatz bei Zitaten für die Zählung ignorieren (s. o.) —
+    // die Markierung selbst deckt bei Auslösung trotzdem den ganzen Satz ab.
+    const satzOhneZuschreibung = satz.replace(ZITAT_ZUSCHREIBUNG_REGEX, "");
+    const wCount = (satzOhneZuschreibung.match(RE_WORT) || []).length;
     if (wCount > 25) {
       const cls = wCount > 35 ? "cm-lesbarkeit-sehr-lang-satz" : "cm-lesbarkeit-lang-satz";
       addMark(m.index, m.index + satz.length, "lang_satz", cls, `Langer Satz: ${wCount} Wörter`);
