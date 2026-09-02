@@ -6,6 +6,7 @@ import {
 	mitUeberschreibungen,
 	findeSeltenesWortBefunde,
 	mitKompositazerlegung,
+	mitEndungsheuristik,
 } from "../src/analyse/wortschatz";
 import type { Frequenzquelle } from "../src/analyse/wortschatz";
 import { tokenisiereWoerter } from "../src/analyse/tokenize";
@@ -166,6 +167,59 @@ describe("mitKompositazerlegung", () => {
 	it("lehnt einen erfundenen Kunstbegriff ab, der aus keinen bekannten Teilen besteht", () => {
 		const basis = testQuelle(["hund", "katze"]);
 		const quelle = mitKompositazerlegung(basis);
+		expect(quelle.istBekannt("Xylophonquetschwabbeligkeit")).toBe(false);
+	});
+});
+
+describe("mitEndungsheuristik", () => {
+	it("erkennt eine um eine Flexionsendung gekürzte Form als bekannt", () => {
+		const basis = testQuelle(["genau", "wenig", "grund", "material"]);
+		const quelle = mitEndungsheuristik(basis);
+		for (const wort of ["genauer", "wenige", "Grunde", "Materialien"]) {
+			expect(quelle.istBekannt(wort)).toBe(true);
+		}
+	});
+
+	it("erkennt ein direkt bekanntes Wort weiterhin ohne Kürzung", () => {
+		const basis = testQuelle(["hund"]);
+		const quelle = mitEndungsheuristik(basis);
+		expect(quelle.istBekannt("Hund")).toBe(true);
+	});
+
+	it("lehnt ein Wort ab, dessen gekürzter Stamm ebenfalls unbekannt ist", () => {
+		const basis = testQuelle(["hund"]);
+		const quelle = mitEndungsheuristik(basis);
+		expect(quelle.istBekannt("Xylophonquetschwabbeligkeiten")).toBe(false);
+	});
+
+	it("kürzt nicht unter die Mindeststammlänge (verhindert Zufallstreffer bei kurzen Wörtern)", () => {
+		const basis = testQuelle(["er"]); // "er" wäre nach Kürzung von "es" leer/zu kurz
+		const quelle = mitEndungsheuristik(basis);
+		expect(quelle.istBekannt("es")).toBe(false);
+	});
+
+	it("ist unabhängig von Groß-/Kleinschreibung", () => {
+		const basis = testQuelle(["genau"]);
+		const quelle = mitEndungsheuristik(basis);
+		expect(quelle.istBekannt("GENAUER")).toBe(true);
+	});
+});
+
+describe("mitEndungsheuristik + echte DeReWo-Liste (Konzept-Feedback: false positives bei Alltagswörtern)", () => {
+	let quelle: Frequenzquelle;
+
+	beforeAll(async () => {
+		const basis = await ladeDerewoFrequenzquelle();
+		quelle = mitEndungsheuristik(basis);
+	});
+
+	it("erkennt zuvor fälschlich als 'selten' markierte Flexionsformen jetzt als bekannt", () => {
+		for (const wort of ["wenige", "genauer", "Grunde", "Materialien"]) {
+			expect(quelle.istBekannt(wort)).toBe(true);
+		}
+	});
+
+	it("erkennt einen erfundenen Kunstbegriff weiterhin nicht als bekannt", () => {
 		expect(quelle.istBekannt("Xylophonquetschwabbeligkeit")).toBe(false);
 	});
 });
