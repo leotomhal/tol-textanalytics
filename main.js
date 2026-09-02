@@ -386,12 +386,13 @@ function analysiereText(originalText) {
   // ── 4. Wortwiederholungen ──
   // Inhaltswort (kein Artikel/Pronomen/Präposition/Konjunktion/Hilfsverb,
   // keine Institutions-Ausnahme, mind. 4 Buchstaben) taucht innerhalb von
-  // WIEDERHOLUNG_SCHWELLE Wörtern erneut auf. Abstand wird über alle
-  // Wörter gezählt (nicht nur Inhaltswörter), damit er dem gefühlten
-  // Leseabstand entspricht. Nur das jeweils erneute Vorkommen wird
-  // markiert, das erste (unauffällige) nicht.
+  // WIEDERHOLUNG_SCHWELLE Wörtern mind. zum dritten Mal auf. Abstand wird
+  // über alle Wörter gezählt (nicht nur Inhaltswörter), damit er dem
+  // gefühlten Leseabstand entspricht. Zweimaliges Vorkommen gilt noch
+  // nicht als Häufung und wird nicht markiert – erst ab dem dritten
+  // Vorkommen im Fenster (das erste und zweite bleiben unauffällig).
   {
-    const letztesVorkommen = new Map(); // Wort (klein) -> laufender Wortindex beim letzten Vorkommen
+    const vorkommen = new Map(); // Wort (klein) -> Array laufender Wortindizes im aktuellen Fenster
     let wortIndex = 0;
     reset(RE_WORT);
     let wm;
@@ -399,15 +400,17 @@ function analysiereText(originalText) {
       wortIndex++;
       const wortLower = wm[0].toLowerCase();
       if (!istRelevantesInhaltswortFuerWiederholung(wortLower)) continue;
-      const letzterIndex = letztesVorkommen.get(wortLower);
-      if (letzterIndex !== undefined && wortIndex - letzterIndex <= WIEDERHOLUNG_SCHWELLE) {
+      let liste = vorkommen.get(wortLower);
+      if (!liste) { liste = []; vorkommen.set(wortLower, liste); }
+      while (liste.length && wortIndex - liste[0] > WIEDERHOLUNG_SCHWELLE) liste.shift();
+      if (liste.length >= 2) {
         addMark(
           wm.index, wm.index + wm[0].length,
           "wiederholung", "cm-lesbarkeit-wiederholung",
-          `Wortwiederholung: „${wm[0]}" (${wortIndex - letzterIndex} Wörter zuvor)`
+          `Wortwiederholung: „${wm[0]}" (${liste.length + 1}. Vorkommen, ${wortIndex - liste[liste.length - 1]} Wörter zuvor)`
         );
       }
-      letztesVorkommen.set(wortLower, wortIndex);
+      liste.push(wortIndex);
     }
   }
 
