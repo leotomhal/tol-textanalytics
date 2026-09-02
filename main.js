@@ -476,6 +476,18 @@ class LesbarkeitSidebarView extends ItemView {
     inp.value = this.plugin.zielZeichen > 0 ? String(this.plugin.zielZeichen) : "";
     inp.min = "0";
 
+    // Bewusst kein "input"-Listener, der bei jedem Tastendruck übernimmt:
+    // aktualisiereAktiveView() stößt eine CM6-Neuberechnung an, die über
+    // aktualisierePanel() renderPanel() aufruft — das baut die Sidebar
+    // (inkl. dieses Eingabefelds) komplett neu auf und der Fokus geht
+    // verloren, sodass nach der ersten Ziffer nichts mehr ankommt. Übernahme
+    // deshalb explizit per Button oder Enter.
+    const uebernehmenBtn = targetRow.createEl("button", {
+      text: "Übernehmen",
+      cls: "lesbarkeit-tag-btn",
+    });
+    uebernehmenBtn.type = "button";
+
     const status = targetRow.createDiv("lesbarkeit-target-status");
 
     const aktualisiereStatus = () => {
@@ -492,11 +504,15 @@ class LesbarkeitSidebarView extends ItemView {
     };
     aktualisiereStatus();
 
-    inp.addEventListener("input", () => {
+    const uebernehmen = () => {
       const val = parseInt(inp.value, 10);
       this.plugin.zielZeichen = isNaN(val) ? 0 : val;
       this.plugin.aktualisiereAktiveView();
       aktualisiereStatus();
+    };
+    uebernehmenBtn.addEventListener("click", uebernehmen);
+    inp.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") uebernehmen();
     });
   }
 
