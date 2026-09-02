@@ -1,4 +1,4 @@
-# tol_textanalytics
+# tol-textanalytics
 
 Obsidian-Plugin „TOL Textanalyse" — Lesbarkeitsanalyse für deutsche Texte:
 Highlighting im Editor (lange Sätze, Passiv, Füllwörter, monotone
