@@ -175,28 +175,12 @@ function maskiereMarkdown(text) {
   // 8. HTML-Kommentare
   mask(/<!--[\s\S]*?-->/g);
 
-  // 9. Überschriften: `#`-Marker maskieren, Zeilenende mit virtuellem Punkt versehen,
-  //    damit die Überschrift als eigener Satz erkannt wird.
-  //    Original-Länge muss erhalten bleiben.
-  m = m.replace(/^(#{1,6})(\s+)([^\n]+?)(\s*)$/gm, (match, hashes, sp1, inhalt, sp2) => {
-    // Hashes und führende Leerzeichen durch Leerzeichen ersetzen
-    const prefix = " ".repeat(hashes.length + sp1.length);
-    // Hat die Überschrift schon ein Satzendzeichen?
-    if (/[.!?…:]$/.test(inhalt)) {
-      // Schon vorhanden – nur Hashes maskieren
-      return prefix + inhalt + sp2;
-    }
-    // Letztes Zeichen durch '.' ersetzen, damit Länge gleich bleibt
-    // Falls der Inhalt mit einem Leerzeichen/Sonderzeichen endet, einfach Punkt anhängen
-    // (passiert selten, weil wir bereits getrimmt haben)
-    const inhaltMitPunkt = inhalt.slice(0, -1) + (inhalt.slice(-1).match(/\w/) ? inhalt.slice(-1) + "" : inhalt.slice(-1));
-    // Einfacher Ansatz: letztes Wortzeichen lassen, dahinter Punkt fügen wir per sp2 hinzu
-    if (sp2.length >= 1) {
-      return prefix + inhalt + "." + sp2.slice(1);
-    }
-    // sp2 ist leer: dann das letzte Zeichen ersetzen (selten, weil meist \n folgt)
-    return prefix + inhalt.slice(0, -1) + ".";
-  });
+  // 9. Überschriften (#…######) komplett maskieren, wie Frontmatter oder
+  //    Codeblöcke: keine eigenständigen Sätze, folgen anderen Konventionen
+  //    (oft Nominalstil, keine Verben, bewusst kurz/prägnant) — Füllwort-,
+  //    Passiv- und Lange-Sätze-Prüfung sowie die Wort-/Satzstatistiken
+  //    ergäben dort keinen Sinn.
+  mask(/^#{1,6}[ \t]+[^\n]*$/gm);
 
   return m;
 }
