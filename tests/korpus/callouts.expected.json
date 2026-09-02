@@ -1,7 +1,0 @@
-{
-	"beschreibung": "Callouts (Konzept 7: 'Callouts' als Teil des Maskierungstests). Obsidian-Callouts sind syntaktisch Blockquotes mit einer [!typ]-Markerzeile — werden über die bestehende Blockquote-Maskierung mit erfasst, nicht als separater Fall behandelt. Prüft, dass der Callout-Inhalt nicht als Fließtext in die Satzstatistik einfließt.",
-	"istDeutsch": true,
-	"satzlaengen": [7, 7, 9],
-	"woerterGesamt": 51,
-	"woerterMaskiert": 28
-}
