@@ -1,9 +1,0 @@
-{
-	"beschreibung": "PM-artiger Text mit Zwischenüberschriften und Standardschluss (Konzept 7, 8.4) — prüft, dass Zwischenüberschriften nicht in die Satzstatistik einfließen und der Schlussteil ab der ersten Auslöserzeile ausgenommen wird.",
-	"istDeutsch": true,
-	"satzlaengen": [10, 8, 11, 9, 8, 6],
-	"woerterGesamt": 90,
-	"woerterMaskiert": 38,
-	"schlussteilAbZeile": 17,
-	"enthaeltKategorien": ["gleichfoermige-passage"]
-}

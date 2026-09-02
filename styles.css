@@ -1,249 +1,396 @@
-.textanalyse-panel {
-	padding: 8px 12px;
-	font-size: var(--font-ui-small);
+/* TOL Textanalyse – Styles */
+
+.lesbarkeit-sidebar {
+  padding: 12px;
+  font-size: 13px;
 }
 
-.textanalyse-hinweis {
-	color: var(--text-muted);
-	padding: 8px 0;
+.lesbarkeit-sidebar h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-normal);
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 6px;
 }
 
-.textanalyse-hinweis-dezent {
-	font-size: var(--font-ui-smaller);
-	padding: 2px 0;
+.lesbarkeit-section {
+  margin-bottom: 14px;
 }
 
-.textanalyse-wortzahl {
-	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
-	margin-bottom: 8px;
+.lesbarkeit-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
 }
 
-.textanalyse-auswahl-hinweis {
-	font-weight: var(--font-medium);
-	margin-bottom: 8px;
+.lesbarkeit-score-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
 }
 
-.textanalyse-kennzahlen {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-	margin-bottom: 12px;
+.lesbarkeit-score-number {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 48px;
 }
 
-/* Baustein E: Gruppierung der Kennzahlen (Verständlichkeit / Satzbau / Stil)
-   statt einer flachen Liste ohne erkennbare Struktur. */
-.textanalyse-kennzahl-gruppe {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
+.lesbarkeit-score-number.score-gut { color: #4caf50; }
+.lesbarkeit-score-number.score-mittel { color: #ff9800; }
+.lesbarkeit-score-number.score-schwer { color: #f44336; }
+
+.lesbarkeit-score-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
-.textanalyse-kennzahl-gruppentitel {
-	font-size: var(--font-ui-smaller);
-	font-weight: var(--font-medium);
-	text-transform: uppercase;
-	letter-spacing: 0.02em;
-	color: var(--text-muted);
-	margin-bottom: 2px;
+.lesbarkeit-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
 }
 
-.textanalyse-kennzahl {
-	border-left: 3px solid var(--background-modifier-border);
-	padding: 4px 8px;
-	border-radius: var(--radius-s);
+.lesbarkeit-stat {
+  background: var(--background-secondary);
+  border-radius: 6px;
+  padding: 5px 8px;
 }
 
-.textanalyse-status-gruen {
-	border-left-color: var(--text-success);
-}
-.textanalyse-status-gelb {
-	border-left-color: var(--text-warning);
-}
-.textanalyse-status-rot {
-	border-left-color: var(--text-error);
+.lesbarkeit-stat-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-normal);
 }
 
-.textanalyse-kennzahl-kopf {
-	display: flex;
-	justify-content: space-between;
-	gap: 8px;
+.lesbarkeit-stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
 }
 
-.textanalyse-kennzahl-label {
-	color: var(--text-muted);
+/* Kategorie-Zähler */
+.lesbarkeit-cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.textanalyse-kennzahl-wert {
-	font-weight: var(--font-medium);
+.lesbarkeit-cat-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.lesbarkeit-cat-item:hover { opacity: 0.8; }
+
+.lesbarkeit-cat-item.disabled { opacity: 0.35; }
+
+.lesbarkeit-cat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 7px;
+  flex-shrink: 0;
 }
 
-.textanalyse-kennzahl-neben {
-	font-size: var(--font-ui-smaller);
-	color: var(--text-muted);
+.lesbarkeit-cat-name { flex: 1; color: var(--text-normal); }
+
+.lesbarkeit-cat-count {
+  font-weight: 600;
+  font-size: 12px;
+  min-width: 18px;
+  text-align: right;
 }
 
-/* Baustein F: Erklärung immer sichtbar statt nur als Hover-Titel — im
-   Wortliga-Vergleich blieb sonst unklar, was ein Wert überhaupt bedeutet. */
-.textanalyse-kennzahl-tooltip {
-	font-size: var(--font-ui-smaller);
-	color: var(--text-muted);
-	margin-top: 2px;
+/* Zielzeichenzahl */
+.lesbarkeit-target-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 
-.textanalyse-checkliste {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-	border-top: 1px solid var(--background-modifier-border);
-	padding-top: 8px;
+.lesbarkeit-target-row input[type="number"] {
+  width: 80px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 13px;
 }
 
-.textanalyse-checkliste-zeile {
-	display: flex;
-	justify-content: space-between;
-	align-items: flex-start;
-	padding: 2px 4px;
-	border-radius: var(--radius-s);
+.lesbarkeit-target-status {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.lesbarkeit-target-status.ok { background: #4caf5022; color: #4caf50; }
+.lesbarkeit-target-status.over { background: #f4433622; color: #f44336; }
+
+/* ── CodeMirror Decorations ── */
+
+/* Lange Sätze */
+.cm-lesbarkeit-lang-satz {
+  background-color: rgba(255, 160, 0, 0.18);
+  border-bottom: 2px solid rgba(255, 160, 0, 0.7);
+}
+/* Sehr lange Sätze */
+.cm-lesbarkeit-sehr-lang-satz {
+  background-color: rgba(244, 67, 54, 0.15);
+  border-bottom: 2px solid rgba(244, 67, 54, 0.7);
+}
+/* Passiv */
+.cm-lesbarkeit-passiv {
+  background-color: rgba(255, 235, 59, 0.25);
+  border-bottom: 2px solid rgba(255, 235, 59, 0.8);
+}
+/* Nominalstil */
+.cm-lesbarkeit-nominal {
+  background-color: rgba(156, 39, 176, 0.12);
+  border-bottom: 2px solid rgba(156, 39, 176, 0.6);
+}
+/* Füllwörter */
+.cm-lesbarkeit-fuell {
+  background-color: rgba(33, 150, 243, 0.15);
+  border-bottom: 2px solid rgba(33, 150, 243, 0.6);
+}
+/* Wortwiederholungen */
+.cm-lesbarkeit-wiederholung {
+  background-color: rgba(0, 188, 212, 0.15);
+  border-bottom: 2px solid rgba(0, 188, 212, 0.6);
+}
+/* Abkürzungen */
+.cm-lesbarkeit-abk {
+  background-color: rgba(121, 85, 72, 0.15);
+  border-bottom: 2px solid rgba(121, 85, 72, 0.5);
+}
+/* Fremdwörter */
+.cm-lesbarkeit-fremd {
+  background-color: rgba(255, 87, 34, 0.12);
+  border-bottom: 2px solid rgba(255, 87, 34, 0.55);
 }
 
-.textanalyse-checkliste-links {
-	display: flex;
-	align-items: flex-start;
-	gap: 6px;
-	min-width: 0;
+/* Zielüberschreitung */
+.cm-lesbarkeit-overlimit {
+  background-color: rgba(244, 67, 54, 0.13);
 }
 
-/* Baustein B: Farbpunkt in derselben Farbe wie die Markierung im Editor —
-   stellt den fehlenden visuellen Bezug zwischen Checkliste und Text her.
-   Farbe kommt pro Zeile über eine Inline-Custom-Property aus kategorien.ts. */
-.textanalyse-farbpunkt {
-	width: 10px;
-	height: 10px;
-	min-width: 10px;
-	border-radius: 50%;
-	margin-top: 4px;
-	background: var(--textanalyse-farbpunkt-farbe, var(--background-modifier-border));
+/* Tooltip */
+.lesbarkeit-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 12px;
+  color: var(--text-normal);
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  max-width: 220px;
 }
 
-.textanalyse-checkliste-text {
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
+/* Toggle-Button */
+.lesbarkeit-toggle-btn {
+  width: 100%;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+.lesbarkeit-toggle-btn:hover {
+  background: var(--background-modifier-hover);
+}
+.lesbarkeit-toggle-btn.aktiv {
+  background: #4caf5022;
+  border-color: #4caf5066;
+  color: #4caf50;
+  font-weight: 500;
 }
 
-/* Baustein D: kurze, immer sichtbare Erklärung statt bloßem Kategorienamen. */
-.textanalyse-checkliste-erklaerung {
-	font-size: var(--font-ui-smaller);
-	color: var(--text-muted);
+/* Inaktiv-Hinweis */
+.lesbarkeit-inaktiv-hinweis {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-line;
 }
 
-.textanalyse-checkliste-rechts {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	flex: none;
-	margin-top: 2px;
+/* ── Einstellungsseite ── */
+.lesbarkeit-settings-divider {
+  border: none;
+  border-top: 1px solid var(--background-modifier-border);
+  margin: 20px 0;
 }
 
-.textanalyse-checkliste-klickbar {
-	cursor: pointer;
-}
-.textanalyse-checkliste-klickbar:hover {
-	background: var(--background-modifier-hover);
+.lesbarkeit-tag-editor {
+  margin-bottom: 16px;
 }
 
-.textanalyse-checkliste-anzahl {
-	color: var(--text-muted);
-	min-width: 1.5em;
-	text-align: right;
+.lesbarkeit-tag-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  margin-bottom: 8px;
+  cursor: text;
 }
 
-.textanalyse-nav-button,
-.textanalyse-sichtbarkeit-schalter {
-	background: transparent;
-	border: none;
-	cursor: pointer;
-	padding: 0 2px;
-	color: var(--text-muted);
-	font-size: var(--font-ui-small);
-	line-height: 1;
-}
-.textanalyse-nav-button:hover,
-.textanalyse-sichtbarkeit-schalter:hover {
-	color: var(--text-normal);
+.lesbarkeit-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 12px;
+  background: var(--background-modifier-hover);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
 }
 
-/* Markierungen im Editor (Konzept 2.4) — Farben über CSS-Variablen, damit
-   Themes sie überschreiben können. Erscheinen verzögert (1,5 s), siehe
-   main.ts. */
-.textanalyse-mark {
-	border-radius: 2px;
-	box-decoration-break: clone;
+.lesbarkeit-tag-x {
+  cursor: pointer;
+  opacity: 0.5;
+  font-size: 14px;
+  line-height: 1;
+  transition: opacity 0.1s;
 }
-.textanalyse-mark-fuellwort {
-	background: hsl(var(--color-blue-hsl) / 0.25);
-}
-.textanalyse-mark-perfekt {
-	background: hsl(var(--color-purple-hsl) / 0.2);
-}
-.textanalyse-mark-nominalstil,
-.textanalyse-mark-streckverb {
-	background: hsl(var(--color-orange-hsl) / 0.22);
-}
-.textanalyse-mark-gleichfoermige-passage {
-	background: hsl(var(--color-yellow-hsl) / 0.2);
-}
-.textanalyse-mark-seltenes-wort {
-	background: hsl(var(--color-green-hsl) / 0.25);
-}
-.textanalyse-mark-passiv,
-.textanalyse-mark-zustandspassiv {
-	background: hsl(var(--color-pink-hsl) / 0.2);
-}
-.textanalyse-mark-langer-satz,
-.textanalyse-mark-sehr-langer-satz {
-	background: hsl(var(--color-red-hsl) / 0.15);
-}
-.textanalyse-mark-wortwiederholung,
-.textanalyse-mark-abkuerzung {
-	background: hsl(var(--color-cyan-hsl) / 0.2);
+.lesbarkeit-tag-x:hover { opacity: 1; }
+
+.lesbarkeit-tag-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-.textanalyse-wortschatz-sektion {
-	margin-top: 12px;
-	border-top: 1px solid var(--background-modifier-border);
-	padding-top: 8px;
+.lesbarkeit-tag-input {
+  flex: 1;
+  padding: 5px 9px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 13px;
 }
 
-.textanalyse-wortschatz-liste {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
-	margin-bottom: 8px;
+.lesbarkeit-tag-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: 13px;
+  cursor: pointer;
+}
+.lesbarkeit-tag-btn:hover {
+  background: var(--background-modifier-hover);
 }
 
-.textanalyse-wort-chip {
-	background: var(--background-secondary);
-	border-radius: var(--radius-s);
-	padding: 2px 4px;
-	font-size: var(--font-ui-smaller);
+/* Tabs */
+.lesbarkeit-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.lesbarkeit-tab {
+  flex: 1;
+  padding: 8px 12px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.lesbarkeit-tab:hover { color: var(--text-normal); }
+.lesbarkeit-tab.aktiv {
+  color: var(--text-normal);
+  border-bottom-color: var(--interactive-accent);
 }
 
-.textanalyse-wort-ignorieren {
-	background: transparent;
-	border: none;
-	color: var(--text-accent);
-	cursor: pointer;
-	font-size: var(--font-ui-smaller);
-	padding: 0;
+/* Issues-Liste */
+.lesbarkeit-issues-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+}
+.lesbarkeit-issues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.lesbarkeit-issue-item {
+  padding: 7px 10px;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.lesbarkeit-issue-item:hover {
+  background: var(--background-modifier-hover);
+}
+.lesbarkeit-issue-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.lesbarkeit-issue-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.lesbarkeit-issue-cat {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.lesbarkeit-issue-snippet {
+  font-size: 12px;
+  color: var(--text-normal);
+  line-height: 1.4;
+  word-break: break-word;
 }
 
-.textanalyse-immer-markieren-formular {
-	display: flex;
-	gap: 4px;
-}
-
-.textanalyse-immer-markieren-eingabe {
-	flex: 1;
+/* Sprachmelodie – monotone Satzlänge */
+.cm-lesbarkeit-melodie {
+  background-color: rgba(233, 30, 99, 0.08);
+  border-bottom: 2px solid rgba(233, 30, 99, 0.5);
 }

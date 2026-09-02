@@ -1,29 +1,47 @@
 # tol_textanalytics
 
-Obsidian-Plugin „Textanalyse" — prüft den aktiven Text auf Lesbarkeit, Satzbau, Wortschatz und Stil und markiert Befunde an der Fundstelle im Text.
+Obsidian-Plugin „TOL Textanalyse" — Lesbarkeitsanalyse für deutsche Texte:
+Highlighting im Editor (lange Sätze, Passiv, Füllwörter, monotone
+Satzlängen), Flesch-Index, Composite-Score und Zielzeichenzahl. Aktiv nur
+bei Notizen mit `typ: draft` im Frontmatter.
 
-Konzept: [`konzept-textanalyse-plugin.md`](./konzept-textanalyse-plugin.md).
-Umsetzung erfolgt in Milestones (M0–M9), einzeln freigegeben.
+## Stand
+
+Frühere Fassung dieses Repos war ein deutlich umfangreicheres TypeScript-
+Projekt (WSTF/LIX, Nominalstil, Wortschatz-Abgleich gegen eine DeReWo-Liste,
+Profile, ausführliche Testsuite — dokumentiert in
+[`konzept-textanalyse-plugin.md`](./konzept-textanalyse-plugin.md)). Die
+Text-Markierungen im Editor liefen dort aber trotz vollständiger Testsuite
+in der echten Obsidian-Instanz nicht zuverlässig.
+
+Das Repo wurde daher auf ein früher schon einmal funktionierendes, deutlich
+einfacheres Plugin zurückgesetzt: eine einzelne handgeschriebene `main.js`
+ohne Build-Schritt, ohne TypeScript, ohne Tests. Die Text-Markierungen
+laufen über ein CodeMirror-6-`ViewPlugin`, das sich bei jeder
+Dokumentänderung selbst neu berechnet (statt über von außen dispatchte
+StateEffects wie in der vorherigen Fassung) — das war vermutlich auch die
+Ursache des Problems.
+
+`konzept-textanalyse-plugin.md` bleibt als Referenz für die ursprüngliche,
+umfangreichere Zielvision im Repo, beschreibt aber **nicht** mehr den
+aktuellen Funktionsumfang.
 
 ## Entwicklung
 
-```bash
-npm install
-npm run dev      # esbuild --watch
-npm run build    # Typecheck + Production-Build
-npm test         # Vitest
-npm run lint
-```
+Kein Build-Schritt. `main.js`, `manifest.json` und `styles.css` direkt
+bearbeiten und zum Testen nach `<Vault>/.obsidian/plugins/tol-textanalyse/`
+kopieren (oder das Repo dorthin symlinken), dann das Plugin in Obsidian
+neu laden.
 
-Der Ordner `src/analyse/` darf keine `obsidian`-Abhängigkeit importieren (siehe Konzept 2.1) — er ist der isoliert testbare Analysekern.
+## Funktionsumfang
 
-## Offene Punkte aus Konzept Abschnitt 8 (M8-Entscheidungen)
-
-1. **Performance.** Zielwert < 50 ms für 5.000 Wörter (Konzept 8.1). Gemessen: Median ~15–25 ms, auch bei realistischer Markdown-Struktur. Ein Ineffizienz-Bug in `vorbereitung.ts` (kompletter Text wurde bei jedem der ~20 Maskierungsdurchläufe neu zusammengesetzt, auch wenn nichts zu maskieren war) wurde dabei gefunden und mit einem Dirty-Flag-Cache behoben — davor lag der Median bei ~40 ms, teils über der Zielmarke. Ein Web Worker ist damit nicht nötig. `tests/perf.test.ts` bewacht das als Regressionstest (großzügige 200-ms-Schwelle, kein exakter Zielwert — CI-Maschinen streuen stärker).
-2. **Mobile.** Entscheidung (mit Auftraggeber abgestimmt): `isDesktopOnly: true`. Die CodeMirror-Decorations und insbesondere der inoffizielle `.cm`-Zugriff auf die EditorView (siehe `main.ts`) sind auf Obsidian Mobile nicht getestet — Desktop-only ist der ehrlichere Default, bis jemand es auf einem echten Gerät geprüft hat.
-3. **Stemmer-Konsistenz.** Gegenstandslos: Die verfügbare DeReWo-Datenbasis ist eine Wortformenliste ohne Häufigkeitsrang (Abweichung aus M2, siehe `scripts/derewo-aufbereiten.ts`), der Abgleich läuft per exaktem Wortformvergleich ohne Stemmer — es gibt keine zwei Normalisierungspfade, die auseinanderlaufen könnten.
-4. **Schlussteil-Auslöser.** Startliste (`STANDARD_SCHLUSSTEIL_AUSLOESER` in `src/analyse/vorbereitung.ts`) ist **nicht** aus echten Pressemitteilungen abgeleitet, wie es das Konzept eigentlich verlangt — es lagen keine solchen Dateien vor. Stattdessen eine aus allgemein üblichen PM-Konventionen zusammengestellte Liste, in den Settings editierbar. Vor Produktivnutzung gegen echte Formulierungen prüfen und anpassen.
-
-## Bekannte Restrisiken (ungetestet in dieser Sandbox)
-
-`main.ts`, `AnalyseView.ts` und `Settings.ts` sind gegen die echten Obsidian-Typdefinitionen typgeprüft, konnten aber nie gegen eine laufende Obsidian-Instanz getestet werden (diese Entwicklungsumgebung hat keinen Zugriff darauf). Besonders relevant: `main.ts` liest die CodeMirror-6-EditorView über `(editor as any).cm` aus — keine offizielle, dokumentierte Obsidian-API, sondern der in der Community verbreitete De-facto-Weg für eigene Editor-Decorations. Vor Produktivnutzung einmal in einem echten Vault laden und prüfen: Panel-Updates beim Tippen, Markierungen im Editor, Checklisten-Navigation, Settings-Tab.
+- Aktivierung nur bei Notizen mit `typ: draft` im Frontmatter.
+- Markierungen im Editor: lange Sätze (>25 Wörter, >35 Wörter zusätzlich
+  hervorgehoben), Passiv-Konstruktionen (inkl. invertiertes Passiv),
+  Füllwörter, monotone Satzlängen pro Absatz ("Sprachmelodie").
+- Sidebar-Panel mit zwei Tabs: Statistik (Composite-Score, Flesch-Index,
+  Wörter/Zeichen/Sätze/Lesezeit, Kategorien-Zähler mit Klick zum
+  Ein-/Ausblenden, Zielzeichenzahl mit Statusanzeige) und Issues (Liste
+  aller Fundstellen mit Kontext-Snippet, Klick springt zur Stelle im
+  Editor).
+- Tooltip beim Hover über eine Markierung im Editor.

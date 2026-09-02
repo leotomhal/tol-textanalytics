@@ -1,8 +1,0 @@
-{
-	"beschreibung": "Bewusst schlechter Stil (Konzept 7): Nominalstil, Passiv, Schachtelsätze — soll möglichst viele Stilmarker gleichzeitig auslösen.",
-	"istDeutsch": true,
-	"satzlaengen": [31, 13, 44],
-	"woerterGesamt": 88,
-	"woerterMaskiert": 0,
-	"enthaeltKategorien": ["fuellwort", "perfekt", "nominalstil", "passiv", "zustandspassiv"]
-}

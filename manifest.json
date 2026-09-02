@@ -1,10 +1,10 @@
 {
-	"id": "textanalyse",
-	"name": "Textanalyse",
-	"version": "0.0.1",
-	"minAppVersion": "1.5.0",
-	"description": "Prüft den aktiven Text auf Lesbarkeit, Satzbau, Wortschatz und Stil und markiert Befunde an der Fundstelle im Text.",
+	"id": "tol-textanalyse",
+	"name": "TOL Textanalyse",
+	"version": "1.0.0",
+	"minAppVersion": "1.0.0",
+	"description": "Lesbarkeitsanalyse für deutsche Texte: Highlighting, Flesch-Index und Zielzeichenzahl. Aktiv bei Notizen mit typ: draft im Frontmatter.",
 	"author": "leotomhal",
 	"authorUrl": "",
-	"isDesktopOnly": true
+	"isDesktopOnly": false
 }
