@@ -117,6 +117,40 @@ export function mitKompositazerlegung(basis: Frequenzquelle): Frequenzquelle {
 	};
 }
 
+/**
+ * Endungsheuristik gegen falsche "seltenes Wort"-Treffer bei ganz normalen
+ * Flexionsformen (Konzept-Feedback: "wenige", "genauer", "Grunde",
+ * "Materialien" wurden markiert). ABWEICHUNG VOM KONZEPT: Die DeReWo-Liste
+ * ist trotz ihrer Größe (818k Einträge) keine vollständige Flexionsliste —
+ * u. a. Komparativ/Superlativ-Formen ("genauer"), deklinierte Adjektive
+ * ("wenige"), alte Dativ-e-Formen ("Grunde") und unregelmäßige Pluralformen
+ * ("Materialien") fehlen. Statt die Liste zu vervollständigen (dafür fehlen
+ * bessere Rohdaten), wird beim Nachschlagen zusätzlich die um eine typische
+ * Endung gekürzte Form geprüft. Das ist kein echtes Lemmatisieren, sondern
+ * eine bewusst simple Heuristik: sie erzeugt gelegentlich falsche Treffer
+ * (ein tatsächlich unbekanntes Wort gilt fälschlich als bekannt, wenn sein
+ * Wortstamm zufällig auch ein bekanntes Wort ist), aber das ist der
+ * bewusst in Kauf genommene Tausch — deutlich seltener falsche Alarme statt
+ * häufiger falscher Alarme bei alltäglichen Wortformen.
+ */
+const FLEXIONSENDUNGEN = ["esten", "eren", "ern", "ien", "nen", "em", "en", "er", "es", "e", "s"];
+const MIN_STAMMLAENGE = 3;
+
+export function mitEndungsheuristik(basis: Frequenzquelle): Frequenzquelle {
+	return {
+		istBekannt(wort: string): boolean {
+			const w = wort.toLowerCase();
+			if (basis.istBekannt(w)) return true;
+			for (const endung of FLEXIONSENDUNGEN) {
+				if (!w.endsWith(endung)) continue;
+				const stamm = w.slice(0, w.length - endung.length);
+				if (stamm.length >= MIN_STAMMLAENGE && basis.istBekannt(stamm)) return true;
+			}
+			return false;
+		},
+	};
+}
+
 async function entpacke(base64Gzip: string): Promise<string> {
 	const bytes = Uint8Array.from(atob(base64Gzip), (c) => c.charCodeAt(0));
 	const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));

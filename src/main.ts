@@ -6,6 +6,7 @@ import {
 	alleBekanntQuelle,
 	mitUeberschreibungen,
 	mitKompositazerlegung,
+	mitEndungsheuristik,
 } from "./analyse/wortschatz";
 import type { Frequenzquelle } from "./analyse/wortschatz";
 import type { Befund, Ergebnis, Kategorie, KennzahlStatus, Profil } from "./analyse/types";
@@ -112,10 +113,13 @@ export default class TextanalysePlugin extends Plugin {
 		// alleBekanntQuelle-Fallback (keine Fachwort-Korrektur).
 		ladeDerewoFrequenzquelle()
 			.then((quelle) => {
-				// Kompositazerlegung (Konzept, Phase 3/M6) direkt auf die
-				// Basisliste anwenden — effektiveFrequenzquelle() legt die
-				// Ignorier-/Immer-markieren-Überschreibung darüber.
-				this.frequenzquelle = mitKompositazerlegung(quelle);
+				// Reihenfolge: Endungsheuristik zuunterst (greift auch für
+				// Teilwörter innerhalb der Kompositazerlegung, z. B.
+				// "Forschungsmaterialien" → "Forschung" + "Material" statt
+				// "Forschung" + "Materialien"), Kompositazerlegung (Konzept,
+				// Phase 3/M6) darüber. effektiveFrequenzquelle() legt die
+				// Ignorier-/Immer-markieren-Überschreibung ganz oben drauf.
+				this.frequenzquelle = mitKompositazerlegung(mitEndungsheuristik(quelle));
 				this.aktualisiereAktiveNotiz({ erzwungen: false });
 				this.aktualisiereDecorations();
 			})
