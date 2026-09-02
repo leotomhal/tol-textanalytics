@@ -386,13 +386,15 @@ function analysiereText(originalText) {
   // ── 4. Wortwiederholungen ──
   // Inhaltswort (kein Artikel/Pronomen/Präposition/Konjunktion/Hilfsverb,
   // keine Institutions-Ausnahme, mind. 4 Buchstaben) taucht innerhalb von
-  // WIEDERHOLUNG_SCHWELLE Wörtern mind. zum dritten Mal auf. Abstand wird
-  // über alle Wörter gezählt (nicht nur Inhaltswörter), damit er dem
-  // gefühlten Leseabstand entspricht. Zweimaliges Vorkommen gilt noch
-  // nicht als Häufung und wird nicht markiert – erst ab dem dritten
-  // Vorkommen im Fenster (das erste und zweite bleiben unauffällig).
+  // WIEDERHOLUNG_SCHWELLE Wörtern mind. dreimal auf. Abstand wird über alle
+  // Wörter gezählt (nicht nur Inhaltswörter), damit er dem gefühlten
+  // Leseabstand entspricht. Zweimaliges Vorkommen gilt noch nicht als
+  // Häufung. Ab dem dritten Vorkommen im Fenster wird die ganze Häufung
+  // markiert – also auch das erste und zweite Vorkommen, nicht nur die
+  // ab dem dritten.
   {
-    const vorkommen = new Map(); // Wort (klein) -> Array laufender Wortindizes im aktuellen Fenster
+    // Wort (klein) -> alle Vorkommen in Textreihenfolge
+    const vorkommen = new Map();
     let wortIndex = 0;
     reset(RE_WORT);
     let wm;
@@ -402,15 +404,33 @@ function analysiereText(originalText) {
       if (!istRelevantesInhaltswortFuerWiederholung(wortLower)) continue;
       let liste = vorkommen.get(wortLower);
       if (!liste) { liste = []; vorkommen.set(wortLower, liste); }
-      while (liste.length && wortIndex - liste[0] > WIEDERHOLUNG_SCHWELLE) liste.shift();
-      if (liste.length >= 2) {
-        addMark(
-          wm.index, wm.index + wm[0].length,
-          "wiederholung", "cm-lesbarkeit-wiederholung",
-          `Wortwiederholung: „${wm[0]}" (${liste.length + 1}. Vorkommen, ${wortIndex - liste[liste.length - 1]} Wörter zuvor)`
-        );
+      liste.push({ von: wm.index, bis: wm.index + wm[0].length, wortIndex, wort: wm[0] });
+    }
+
+    // Vorkommen je Wort in Häufungen gruppieren: Ein neues Vorkommen gehört
+    // noch zur laufenden Häufung, wenn es höchstens WIEDERHOLUNG_SCHWELLE
+    // Wörter nach dem vorherigen Vorkommen derselben Häufung liegt. Reißt
+    // die Kette, beginnt eine neue Häufung.
+    for (const liste of vorkommen.values()) {
+      let cluster = [liste[0]];
+      const clusterAbschliessen = () => {
+        if (cluster.length < 3) return;
+        cluster.forEach((v, i) => {
+          const tooltip = i === 0
+            ? `Wortwiederholung: „${v.wort}" (1. von ${cluster.length} Vorkommen in der Häufung)`
+            : `Wortwiederholung: „${v.wort}" (${i + 1}. von ${cluster.length}, ${v.wortIndex - cluster[i - 1].wortIndex} Wörter zuvor)`;
+          addMark(v.von, v.bis, "wiederholung", "cm-lesbarkeit-wiederholung", tooltip);
+        });
+      };
+      for (let i = 1; i < liste.length; i++) {
+        if (liste[i].wortIndex - cluster[cluster.length - 1].wortIndex <= WIEDERHOLUNG_SCHWELLE) {
+          cluster.push(liste[i]);
+        } else {
+          clusterAbschliessen();
+          cluster = [liste[i]];
+        }
       }
-      liste.push(wortIndex);
+      clusterAbschliessen();
     }
   }
 
