@@ -139,6 +139,7 @@
   border-radius: 4px;
 }
 .lesbarkeit-target-status.ok { background: #4caf5022; color: #4caf50; }
+.lesbarkeit-target-status.warn { background: #ffb30022; color: #ffb300; }
 .lesbarkeit-target-status.over { background: #f4433622; color: #f44336; }
 
 .lesbarkeit-target-label {
@@ -240,6 +241,11 @@
 /* Zielüberschreitung */
 .cm-lesbarkeit-overlimit {
   background-color: rgba(244, 67, 54, 0.13);
+}
+
+/* Warnstufe (z.B. Überschrift nähert sich der Grenze) */
+.cm-lesbarkeit-warnlimit {
+  background-color: rgba(255, 179, 0, 0.15);
 }
 
 /* Tooltip */

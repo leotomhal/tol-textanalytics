@@ -76,7 +76,9 @@ const EIGENNAMEN_AUSNAHMEN_WIEDERHOLUNG = new Set([
   "wissenschaftlerinnen","wissenschaftlern","halle","wittenberg",
 ]);
 
-// Maximale Zeichenzahl der ersten H1-Überschrift ("# ..."), fest vorgegeben.
+// Zeichenzahl-Ampel der ersten H1-Überschrift ("# ..."), fest vorgegeben:
+// bis WARN grün, bis MAX gelb, danach rot.
+const UEBERSCHRIFT_WARN_ZEICHEN = 60;
 const UEBERSCHRIFT_MAX_ZEICHEN = 80;
 
 // Sucht die erste H1-Überschrift ("# ...", nicht "##...") sowie den direkt
@@ -646,9 +648,12 @@ class LesbarkeitSidebarView extends ItemView {
       ueberschriftStatus.className = "lesbarkeit-target-status";
     } else {
       const laenge = ergebnis.ueberschrift.laenge;
-      if (laenge <= UEBERSCHRIFT_MAX_ZEICHEN) {
+      if (laenge <= UEBERSCHRIFT_WARN_ZEICHEN) {
         ueberschriftStatus.setText(`${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} ✓`);
         ueberschriftStatus.className = "lesbarkeit-target-status ok";
+      } else if (laenge <= UEBERSCHRIFT_MAX_ZEICHEN) {
+        ueberschriftStatus.setText(`${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} ⚠`);
+        ueberschriftStatus.className = "lesbarkeit-target-status warn";
       } else {
         ueberschriftStatus.setText(`${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} ✗ (+${laenge - UEBERSCHRIFT_MAX_ZEICHEN})`);
         ueberschriftStatus.className = "lesbarkeit-target-status over";
@@ -912,16 +917,28 @@ function baueExtension(plugin) {
           } catch(e) {}
         }
 
-        // Überschrift (H1) zu lang
-        if (ergebnis.ueberschrift && ergebnis.ueberschrift.laenge > UEBERSCHRIFT_MAX_ZEICHEN) {
-          try {
-            decos.push(
-              Decoration.mark({
-                class: "cm-lesbarkeit-overlimit",
-                attributes: { "data-lesbarkeit-tooltip": `Überschrift zu lang: ${ergebnis.ueberschrift.laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} Zeichen` }
-              }).range(ergebnis.ueberschrift.von + UEBERSCHRIFT_MAX_ZEICHEN, ergebnis.ueberschrift.bis)
-            );
-          } catch(e) {}
+        // Überschrift (H1): Ampel – ab WARN gelb, ab MAX rot
+        if (ergebnis.ueberschrift) {
+          const laenge = ergebnis.ueberschrift.laenge;
+          if (laenge > UEBERSCHRIFT_MAX_ZEICHEN) {
+            try {
+              decos.push(
+                Decoration.mark({
+                  class: "cm-lesbarkeit-overlimit",
+                  attributes: { "data-lesbarkeit-tooltip": `Überschrift zu lang: ${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} Zeichen` }
+                }).range(ergebnis.ueberschrift.von + UEBERSCHRIFT_MAX_ZEICHEN, ergebnis.ueberschrift.bis)
+              );
+            } catch(e) {}
+          } else if (laenge > UEBERSCHRIFT_WARN_ZEICHEN) {
+            try {
+              decos.push(
+                Decoration.mark({
+                  class: "cm-lesbarkeit-warnlimit",
+                  attributes: { "data-lesbarkeit-tooltip": `Überschrift wird lang: ${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} Zeichen` }
+                }).range(ergebnis.ueberschrift.von + UEBERSCHRIFT_WARN_ZEICHEN, ergebnis.ueberschrift.bis)
+              );
+            } catch(e) {}
+          }
         }
 
         // Teaser zu lang (nur wenn Ziel gesetzt)
