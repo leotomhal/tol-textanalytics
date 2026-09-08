@@ -590,6 +590,79 @@ class LesbarkeitSidebarView extends ItemView {
   }
 
   renderStatsTab(container, ergebnis) {
+    // ── Struktur: Überschrift & Teaser ──
+    const strukturSection = container.createDiv("lesbarkeit-section lesbarkeit-section-gross");
+    strukturSection.createDiv({ cls: "lesbarkeit-section-title", text: "Länge Überschrift & Teaser" });
+
+    // Überschrift (H1): feste Grenze, keine Einstellung nötig.
+    const ueberschriftRow = strukturSection.createDiv("lesbarkeit-target-row");
+    ueberschriftRow.createDiv({ cls: "lesbarkeit-target-label", text: "Überschrift (H1)" });
+    const ueberschriftStatus = ueberschriftRow.createDiv("lesbarkeit-target-status");
+    if (!ergebnis || !ergebnis.ueberschrift) {
+      ueberschriftStatus.setText(ergebnis ? "Keine H1 gefunden" : "–");
+      ueberschriftStatus.className = "lesbarkeit-target-status";
+    } else {
+      const laenge = ergebnis.ueberschrift.laenge;
+      if (laenge <= UEBERSCHRIFT_MAX_ZEICHEN) {
+        ueberschriftStatus.setText(`${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} ✓`);
+        ueberschriftStatus.className = "lesbarkeit-target-status ok";
+      } else {
+        ueberschriftStatus.setText(`${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} ✗ (+${laenge - UEBERSCHRIFT_MAX_ZEICHEN})`);
+        ueberschriftStatus.className = "lesbarkeit-target-status over";
+      }
+    }
+
+    // Teaser (erster gefetteter Absatz nach der H1): Ziel als Umschalter
+    // zwischen den beiden gängigen Längen, statt Freitext.
+    const TEASER_OPTIONEN = [480, 700];
+    const teaserRow = strukturSection.createDiv("lesbarkeit-target-row");
+    teaserRow.createDiv({ cls: "lesbarkeit-target-label", text: "Teaser" });
+
+    const teaserSchalter = teaserRow.createDiv("lesbarkeit-toggle-group");
+    const teaserButtons = TEASER_OPTIONEN.map(wert => {
+      const btn = teaserSchalter.createEl("button", {
+        text: String(wert),
+        cls: "lesbarkeit-toggle-btn" + (this.plugin.zielTeaserZeichen === wert ? " aktiv" : ""),
+      });
+      btn.type = "button";
+      return btn;
+    });
+
+    const teaserStatus = teaserRow.createDiv("lesbarkeit-target-status");
+
+    const aktualisiereTeaserStatus = () => {
+      if (!ergebnis || !ergebnis.teaser) {
+        teaserStatus.setText(ergebnis ? "Kein Teaser (** ** direkt nach H1) gefunden" : "–");
+        teaserStatus.className = "lesbarkeit-target-status";
+        return;
+      }
+      const laenge = ergebnis.teaser.laenge;
+      const ziel = this.plugin.zielTeaserZeichen;
+      if (ziel <= 0) {
+        teaserStatus.setText(`${laenge} Zeichen`);
+        teaserStatus.className = "lesbarkeit-target-status";
+        return;
+      }
+      if (laenge <= ziel) {
+        teaserStatus.setText(`${laenge} / ${ziel} ✓`);
+        teaserStatus.className = "lesbarkeit-target-status ok";
+      } else {
+        teaserStatus.setText(`${laenge} / ${ziel} ✗ (+${laenge - ziel})`);
+        teaserStatus.className = "lesbarkeit-target-status over";
+      }
+    };
+    aktualisiereTeaserStatus();
+
+    teaserButtons.forEach((btn, i) => {
+      btn.addEventListener("click", () => {
+        this.plugin.zielTeaserZeichen = TEASER_OPTIONEN[i];
+        teaserButtons.forEach(b => b.removeClass("aktiv"));
+        btn.addClass("aktiv");
+        this.plugin.aktualisiereAktiveView();
+        aktualisiereTeaserStatus();
+      });
+    });
+
     // ── Flesch + Score ──
     const scoreSection = container.createDiv("lesbarkeit-section");
     scoreSection.createDiv({ cls: "lesbarkeit-section-title", text: "Textqualität" });
@@ -708,79 +781,6 @@ class LesbarkeitSidebarView extends ItemView {
     uebernehmenBtn.addEventListener("click", uebernehmen);
     inp.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter") uebernehmen();
-    });
-
-    // ── Struktur: Überschrift & Teaser ──
-    const strukturSection = container.createDiv("lesbarkeit-section");
-    strukturSection.createDiv({ cls: "lesbarkeit-section-title", text: "Überschrift & Teaser" });
-
-    // Überschrift (H1): feste Grenze, keine Einstellung nötig.
-    const ueberschriftRow = strukturSection.createDiv("lesbarkeit-target-row");
-    ueberschriftRow.createDiv({ cls: "lesbarkeit-target-label", text: "Überschrift (H1)" });
-    const ueberschriftStatus = ueberschriftRow.createDiv("lesbarkeit-target-status");
-    if (!ergebnis || !ergebnis.ueberschrift) {
-      ueberschriftStatus.setText(ergebnis ? "Keine H1 gefunden" : "–");
-      ueberschriftStatus.className = "lesbarkeit-target-status";
-    } else {
-      const laenge = ergebnis.ueberschrift.laenge;
-      if (laenge <= UEBERSCHRIFT_MAX_ZEICHEN) {
-        ueberschriftStatus.setText(`${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} ✓`);
-        ueberschriftStatus.className = "lesbarkeit-target-status ok";
-      } else {
-        ueberschriftStatus.setText(`${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} ✗ (+${laenge - UEBERSCHRIFT_MAX_ZEICHEN})`);
-        ueberschriftStatus.className = "lesbarkeit-target-status over";
-      }
-    }
-
-    // Teaser (erster gefetteter Absatz nach der H1): Ziel als Umschalter
-    // zwischen den beiden gängigen Längen, statt Freitext.
-    const TEASER_OPTIONEN = [480, 700];
-    const teaserRow = strukturSection.createDiv("lesbarkeit-target-row");
-    teaserRow.createDiv({ cls: "lesbarkeit-target-label", text: "Teaser" });
-
-    const teaserSchalter = teaserRow.createDiv("lesbarkeit-toggle-group");
-    const teaserButtons = TEASER_OPTIONEN.map(wert => {
-      const btn = teaserSchalter.createEl("button", {
-        text: String(wert),
-        cls: "lesbarkeit-toggle-btn" + (this.plugin.zielTeaserZeichen === wert ? " aktiv" : ""),
-      });
-      btn.type = "button";
-      return btn;
-    });
-
-    const teaserStatus = teaserRow.createDiv("lesbarkeit-target-status");
-
-    const aktualisiereTeaserStatus = () => {
-      if (!ergebnis || !ergebnis.teaser) {
-        teaserStatus.setText(ergebnis ? "Kein Teaser (** ** direkt nach H1) gefunden" : "–");
-        teaserStatus.className = "lesbarkeit-target-status";
-        return;
-      }
-      const laenge = ergebnis.teaser.laenge;
-      const ziel = this.plugin.zielTeaserZeichen;
-      if (ziel <= 0) {
-        teaserStatus.setText(`${laenge} Zeichen`);
-        teaserStatus.className = "lesbarkeit-target-status";
-        return;
-      }
-      if (laenge <= ziel) {
-        teaserStatus.setText(`${laenge} / ${ziel} ✓`);
-        teaserStatus.className = "lesbarkeit-target-status ok";
-      } else {
-        teaserStatus.setText(`${laenge} / ${ziel} ✗ (+${laenge - ziel})`);
-        teaserStatus.className = "lesbarkeit-target-status over";
-      }
-    };
-    aktualisiereTeaserStatus();
-
-    teaserButtons.forEach((btn, i) => {
-      btn.addEventListener("click", () => {
-        this.plugin.zielTeaserZeichen = TEASER_OPTIONEN[i];
-        teaserButtons.forEach(b => b.removeClass("aktiv"));
-        btn.addClass("aktiv");
-        this.plugin.aktualisiereAktiveView();
-        aktualisiereTeaserStatus();
-      });
     });
   }
 

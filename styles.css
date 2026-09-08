@@ -170,6 +170,25 @@
   color: var(--text-on-accent);
 }
 
+/* Größere Darstellung für hervorgehobene Abschnitte (z.B. Länge Überschrift & Teaser) */
+.lesbarkeit-section-gross .lesbarkeit-section-title {
+  font-size: 13px;
+}
+.lesbarkeit-section-gross .lesbarkeit-target-label {
+  font-size: 15px;
+}
+.lesbarkeit-section-gross .lesbarkeit-target-status {
+  font-size: 14px;
+  padding: 4px 10px;
+}
+.lesbarkeit-section-gross .lesbarkeit-toggle-btn {
+  font-size: 15px;
+  padding: 6px 14px;
+}
+.lesbarkeit-section-gross .lesbarkeit-target-row {
+  margin-bottom: 10px;
+}
+
 /* ── CodeMirror Decorations ── */
 
 /* Lange Sätze */
