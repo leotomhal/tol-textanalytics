@@ -146,6 +146,30 @@
   color: var(--text-muted);
 }
 
+/* Teaser-Zielwert-Umschalter */
+.lesbarkeit-toggle-group {
+  display: flex;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.lesbarkeit-toggle-btn {
+  padding: 4px 10px;
+  font-size: 13px;
+  border: none;
+  border-right: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+.lesbarkeit-toggle-btn:last-child { border-right: none; }
+.lesbarkeit-toggle-btn:hover { background: var(--background-modifier-hover); }
+.lesbarkeit-toggle-btn.aktiv {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
 /* ── CodeMirror Decorations ── */
 
 /* Lange Sätze */

@@ -732,18 +732,21 @@ class LesbarkeitSidebarView extends ItemView {
       }
     }
 
-    // Teaser (erster gefetteter Absatz nach der H1): Ziel selbst einstellbar.
+    // Teaser (erster gefetteter Absatz nach der H1): Ziel als Umschalter
+    // zwischen den beiden gängigen Längen, statt Freitext.
+    const TEASER_OPTIONEN = [480, 700];
     const teaserRow = strukturSection.createDiv("lesbarkeit-target-row");
     teaserRow.createDiv({ cls: "lesbarkeit-target-label", text: "Teaser" });
-    const teaserInp = teaserRow.createEl("input", { type: "number", placeholder: "z.B. 150" });
-    teaserInp.value = this.plugin.zielTeaserZeichen > 0 ? String(this.plugin.zielTeaserZeichen) : "";
-    teaserInp.min = "0";
 
-    const teaserBtn = teaserRow.createEl("button", {
-      text: "Übernehmen",
-      cls: "lesbarkeit-tag-btn",
+    const teaserSchalter = teaserRow.createDiv("lesbarkeit-toggle-group");
+    const teaserButtons = TEASER_OPTIONEN.map(wert => {
+      const btn = teaserSchalter.createEl("button", {
+        text: String(wert),
+        cls: "lesbarkeit-toggle-btn" + (this.plugin.zielTeaserZeichen === wert ? " aktiv" : ""),
+      });
+      btn.type = "button";
+      return btn;
     });
-    teaserBtn.type = "button";
 
     const teaserStatus = teaserRow.createDiv("lesbarkeit-target-status");
 
@@ -770,15 +773,14 @@ class LesbarkeitSidebarView extends ItemView {
     };
     aktualisiereTeaserStatus();
 
-    const teaserUebernehmen = () => {
-      const val = parseInt(teaserInp.value, 10);
-      this.plugin.zielTeaserZeichen = isNaN(val) ? 0 : val;
-      this.plugin.aktualisiereAktiveView();
-      aktualisiereTeaserStatus();
-    };
-    teaserBtn.addEventListener("click", teaserUebernehmen);
-    teaserInp.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") teaserUebernehmen();
+    teaserButtons.forEach((btn, i) => {
+      btn.addEventListener("click", () => {
+        this.plugin.zielTeaserZeichen = TEASER_OPTIONEN[i];
+        teaserButtons.forEach(b => b.removeClass("aktiv"));
+        btn.addClass("aktiv");
+        this.plugin.aktualisiereAktiveView();
+        aktualisiereTeaserStatus();
+      });
     });
   }
 
