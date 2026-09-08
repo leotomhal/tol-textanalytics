@@ -157,13 +157,32 @@ function istRelevantesInhaltswortFuerWiederholung(wortLower) {
   return true;
 }
 
-// Normales Passiv: Hilfsverb + Partizip II
-// z.B. "wird geprüft", "wurde beschlossen", "werden berücksichtigt"
-const PASSIV_REGEX = /\b(wird|werden|wurde|wurden|worden|worden\s+ist|worden\s+sind|worden\s+war|worden\s+waren)\s+\w*(ge\w+(t|en)|[\w]+t|[\w]+en)\b/gi;
+// Partizip II ohne Lexikon: ge-Form (auch mit trennbarer Vorsilbe wie
+// "durchgeführt"), untrennbare Vorsilben, über-/unter- auf -t und -iert.
+// Bewusst eng gehalten: Eine lose Variante "irgendein Wort auf -t/-en"
+// würde "wird nicht", "wird Zeit" oder "Proben werden" mitzählen.
+const PARTIZIP_II_QUELLE = "(?:(?:ab|an|auf|aus|bei|durch|ein|her|hin|mit|nach|vor|weg|zu|zurück|über|unter|um)?ge[a-zäöüß]{2,}(?:t|en)|(?:be|ent|er|ver|zer|emp|miss)[a-zäöüß]{2,}(?:t|en)|(?:über|unter)[a-zäöüß]{2,}t|[a-zäöüß]{3,}iert)";
 
-// Invertiertes Passiv: Partizip II + Hilfsverb
-// z.B. "Ergänzt werden diese Daten", "Beschlossen wurde", "Geprüft werden"
-const PASSIV_INVERS_REGEX = /\b(ge[a-zäöüß]+(t|en)|[a-zäöüß]+(iert|iert\b|t|en))\s+(wird|werden|wurde|wurden)\b/gi;
+// Normales Passiv: Hilfsverb + Partizip II, dazwischen bis zu fünf Wörter
+// ("werden im Labor gelagert"). Musste das Partizip unmittelbar folgen,
+// fiel die Mehrzahl der echten Passivsätze durch. Satzzeichen begrenzen
+// den Zwischenraum, damit die Suche nicht über den Teilsatz hinausläuft.
+// Ohne "i"-Flag, damit das Partizip kleingeschrieben sein muss: Sonst
+// zählt "wird Zeit für neue Verfahren" als Passiv, weil das Substantiv
+// "Verfahren" formal aufs Muster passt. Hilfsverben deshalb explizit
+// gross/klein.
+const PASSIV_REGEX = new RegExp(
+  "\\b(?:[Ww]ird|[Ww]erden|[Ww]urde|[Ww]urden|[Ww]orden)\\s+(?:[a-zäöüßA-ZÄÖÜ0-9-]+\\s+){0,5}?" +
+  PARTIZIP_II_QUELLE + "(?![a-zäöüßA-ZÄÖÜ])",
+  "g"
+);
+
+// Invertiertes Passiv ("Gefördert wurde die Arbeit"): nur echte Partizipien
+// und nur am Satz- oder Teilsatzanfang.
+const PASSIV_INVERS_REGEX = new RegExp(
+  "(?:^|[.!?…:;]\\s+|,\\s+)(" + PARTIZIP_II_QUELLE + ")\\s+(?:wird|werden|wurde|wurden)\\b",
+  "gi"
+);
 
 // ─────────────────────────────────────────────
 // SILBENZÄHLUNG (Deutsch, Näherung)
@@ -404,17 +423,22 @@ function istNominalstilAusnahme(klein) {
 
 // Funktionsverbgefüge/Streckverben — als Regex, damit Flexion mitgeht.
 const STRECKVERBEN = [
-  { re: /\bzur\s+Anwendung\s+(kommt|kommen|kam|kamen|gebracht|bringen)\b/gi, tipp: "anwenden" },
-  { re: /\bzum\s+Einsatz\s+(kommt|kommen|kam|kamen|gebracht|bringen)\b/gi, tipp: "einsetzen" },
-  { re: /\bin\s+Betracht\s+(ziehen|gezogen|zieht|zog)\b/gi, tipp: "erwägen" },
-  { re: /\bunter\s+Beweis\s+(stellen|gestellt|stellt|stellte)\b/gi, tipp: "beweisen" },
-  { re: /\b(Anwendung|Berücksichtigung|Verwendung|Anerkennung)\s+(findet|finden|fand|fanden|gefunden)\b/gi, tipp: "das passende Verb" },
-  { re: /\bin\s+Angriff\s+(nehmen|genommen|nimmt)\b/gi, tipp: "beginnen" },
-  { re: /\bzum\s+Abschluss\s+(bringen|gebracht|bringt)\b/gi, tipp: "abschließen" },
-  { re: /\beine?\s+Entscheidung\s+(treffen|getroffen|trifft|traf)\b/gi, tipp: "entscheiden" },
-  { re: /\bDurchführung\s+(von|der|des|eines|einer)\b/gi, tipp: "durchführen" },
+  // Die feste Präpositionalphrase ist der Marker: Im Deutschen steht das
+  // Verb meist davor ("kam zur Anwendung"), eine Regex mit fester
+  // Reihenfolge Phrase-vor-Verb würde genau den Normalfall verpassen.
+  { re: /\bzur\s+Anwendung\b/gi, tipp: "anwenden" },
+  { re: /\bzum\s+Einsatz\b/gi, tipp: "einsetzen" },
+  { re: /\bin\s+Betracht\b/gi, tipp: "erwägen" },
+  { re: /\bunter\s+Beweis\b/gi, tipp: "beweisen" },
+  { re: /\bin\s+Angriff\b/gi, tipp: "beginnen" },
   { re: /\bunter\s+Berücksichtigung\b/gi, tipp: "berücksichtigen" },
-  { re: /\beine?\s+Untersuchung\s+(durchführen|durchgeführt|durchführt)\b/gi, tipp: "untersuchen" },
+  { re: /\bzum\s+Abschluss\s+(bringen|gebracht|bringt|brachte)\b/gi, tipp: "abschließen" },
+  { re: /\b(Anwendung|Berücksichtigung|Verwendung|Anerkennung)\s+(findet|finden|fand|fanden|gefunden)\b/gi, tipp: "das passende Verb" },
+  { re: /\b(findet|finden|fand|fanden|gefunden)\s+(Anwendung|Berücksichtigung|Verwendung|Anerkennung)\b/gi, tipp: "das passende Verb" },
+  { re: /\bein[e]?\s+Entscheidung\s+(treffen|getroffen|trifft|traf)\b/gi, tipp: "entscheiden" },
+  { re: /\b(trifft|treffen|traf|getroffen)\s+ein[e]?\s+Entscheidung\b/gi, tipp: "entscheiden" },
+  { re: /\bDurchführung\s+(von|der|des|eines|einer)\b/gi, tipp: "durchführen" },
+  { re: /\bein[e]?\s+Untersuchung\s+(durchführen|durchgeführt|durchführt)\b/gi, tipp: "untersuchen" },
 ];
 
 // ─────────────────────────────────────────────
@@ -424,18 +448,13 @@ const STRECKVERBEN = [
 // ("ist geplant") vorliegt — die Fehlerquote wäre höher als der Nutzen.
 // ─────────────────────────────────────────────
 const HABEN_FORM_REGEX = /\b(hat|haben|habe|hast|habt|hatte|hatten|hattest|hattet)\b/gi;
-// Partizip II ohne Lexikon: ge-Form, untrennbare Vorsilben und -iert.
-// Bei "über"/"unter" nur die schwache Form auf -t ("überprüft",
-// "unterstützt"), sonst würden Infinitive wie "unternehmen" oder
-// "überlegen" mitgehen.
-const PARTIZIP_II_QUELLE = "(?:ge[a-zäöüß]{2,}(?:t|en)|(?:be|ent|er|ver|zer|emp|miss)[a-zäöüß]{2,}(?:t|en)|(?:über|unter)[a-zäöüß]{2,}t|[a-zäöüß]{3,}iert)";
 const PERFEKT_MAX_ABSTAND = 12; // Token zwischen Hilfsverb und Partizip
 
 // ─────────────────────────────────────────────
 // ABKÜRZUNGEN (Konzept 3.6)
 // Großbuchstabenfolgen ≥ 2, die beim ersten Auftreten nicht aufgelöst werden.
 // ─────────────────────────────────────────────
-const ABKUERZUNG_REGEX = /\b[A-ZÄÖÜ]{2,}(?:-[A-ZÄÖÜ0-9]+)?\b/g;
+const ABKUERZUNG_REGEX = /(?<![a-zäöüßA-ZÄÖÜ])[A-ZÄÖÜ]{2,}(?:-[A-ZÄÖÜ0-9]+)?(?![a-zäöüßA-ZÄÖÜ])/g;
 const ABKUERZUNG_BEKANNT = new Set([
   "EU", "USA", "UNO", "UN", "WHO", "UNESCO", "OECD", "NATO", "DDR", "BRD",
   "ARD", "ZDF", "PDF", "URL", "USB", "LED", "DNA", "RNA", "PC", "TV", "IT",
@@ -507,7 +526,11 @@ const KATEGORIEN = [
 // ─────────────────────────────────────────────
 // EINSTELLUNGEN
 // ─────────────────────────────────────────────
-const DEFAULT_SETTINGS = {};
+const DEFAULT_SETTINGS = {
+  zielZeichen: 0,
+  zielTeaserZeichen: 480,
+  deaktivierteKategorien: [],
+};
 
 class LesbarkeitSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
@@ -520,7 +543,60 @@ class LesbarkeitSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl("h2", { text: "TOL Textanalyse" });
     containerEl.createEl("p", {
-      text: "Das Plugin analysiert Notizen mit typ: draft im Frontmatter. Erkannt werden lange Sätze, Passiv-Konstruktionen und Füllwörter.",
+      text: "Analysiert Notizen mit typ: draft im Frontmatter. Die Werte hier gelten global und werden mit dem Vault gespeichert.",
+      cls: "setting-item-description"
+    });
+
+    new Setting(containerEl)
+      .setName("Zielzeichenzahl")
+      .setDesc("Zeichen für den gesamten Text. 0 = keine Prüfung.")
+      .addText(text => text
+        .setPlaceholder("0")
+        .setValue(String(this.plugin.zielZeichen || 0))
+        .onChange(async (wert) => {
+          const zahl = parseInt(wert, 10);
+          this.plugin.zielZeichen = isNaN(zahl) || zahl < 0 ? 0 : zahl;
+          this.plugin.speichereZustand();
+          this.plugin.aktualisiereAktiveView();
+        }));
+
+    new Setting(containerEl)
+      .setName("Zielzeichenzahl Teaser")
+      .setDesc("Länge des gefetteten Absatzes direkt nach der H1-Überschrift.")
+      .addDropdown(dd => dd
+        .addOption("480", "480 Zeichen")
+        .addOption("700", "700 Zeichen")
+        .setValue(String(this.plugin.zielTeaserZeichen === 700 ? 700 : 480))
+        .onChange(async (wert) => {
+          this.plugin.zielTeaserZeichen = parseInt(wert, 10);
+          this.plugin.speichereZustand();
+          this.plugin.aktualisiereAktiveView();
+        }));
+
+    containerEl.createEl("hr", { cls: "lesbarkeit-settings-divider" });
+    containerEl.createEl("h3", { text: "Kategorien" });
+    containerEl.createEl("p", {
+      text: "Abgeschaltete Kategorien werden weder im Editor markiert noch unter Issues gelistet. Lässt sich auch direkt in der Sidebar umschalten.",
+      cls: "setting-item-description"
+    });
+
+    for (const kat of KATEGORIEN) {
+      new Setting(containerEl)
+        .setName(kat.label)
+        .addToggle(toggle => toggle
+          .setValue(!this.plugin.deaktiviert.has(kat.id))
+          .onChange(async (an) => {
+            if (an) this.plugin.deaktiviert.delete(kat.id);
+            else this.plugin.deaktiviert.add(kat.id);
+            this.plugin.speichereZustand();
+            this.plugin.aktualisiereAktiveView();
+            this.plugin.aktualisierePanel();
+          }));
+    }
+
+    containerEl.createEl("hr", { cls: "lesbarkeit-settings-divider" });
+    containerEl.createEl("p", {
+      text: `Feste Grenzwerte: H1-Überschrift grün bis ${UEBERSCHRIFT_WARN_ZEICHEN}, gelb bis ${UEBERSCHRIFT_MAX_ZEICHEN} Zeichen. Lange Sätze ab 25 Wörtern, sehr lange ab 35.`,
       cls: "setting-item-description"
     });
   }
@@ -635,12 +711,16 @@ function analysiereText(originalText) {
   // Invertiertes Passiv
   reset(PASSIV_INVERS_REGEX);
   while ((m = PASSIV_INVERS_REGEX.exec(text)) !== null) {
-    addMark(m.index, m.index + m[0].length, "passiv", "cm-lesbarkeit-passiv", "Invertiertes Passiv");
+    // Satztrenner vor dem Partizip gehört nicht zur Markierung
+    const versatz = m[0].indexOf(m[1]);
+    addMark(m.index + versatz, m.index + m[0].length, "passiv", "cm-lesbarkeit-passiv", "Invertiertes Passiv");
   }
 
   // ── 3. Füllwörter ──
   for (const fw of FUELLWOERTER) {
-    const re = new RegExp(`\\b${fw}\\b`, "gi");
+    // \b scheitert an Umlauten: Vor "ü" in "übrigens" liegt keine
+    // Wortgrenze, weil \w das Zeichen nicht kennt. Deshalb Lookarounds.
+    const re = new RegExp(`(?<![a-zäöüßA-ZÄÖÜ])${fw}(?![a-zäöüßA-ZÄÖÜ])`, "gi");
     while ((m = re.exec(text)) !== null) {
       addMark(m.index, m.index + m[0].length, "fuell", "cm-lesbarkeit-fuell", `Füllwort: „${m[0]}"`);
     }
@@ -905,6 +985,7 @@ class LesbarkeitSidebarView extends ItemView {
     const zeichenUebernehmen = () => {
       const val = parseInt(zeichenInp.value, 10);
       this.plugin.zielZeichen = isNaN(val) ? 0 : val;
+      this.plugin.speichereZustand();
       this.plugin.aktualisiereAktiveView();
       aktualisiereZeichenStatus();
     };
@@ -978,6 +1059,7 @@ class LesbarkeitSidebarView extends ItemView {
     teaserButtons.forEach((btn, i) => {
       btn.addEventListener("click", () => {
         this.plugin.zielTeaserZeichen = TEASER_OPTIONEN[i];
+        this.plugin.speichereZustand();
         teaserButtons.forEach(b => b.removeClass("aktiv"));
         btn.addClass("aktiv");
         this.plugin.aktualisiereAktiveView();
@@ -1145,6 +1227,7 @@ class LesbarkeitSidebarView extends ItemView {
         } else {
           this.plugin.deaktiviert.add(kat.id);
         }
+        this.plugin.speichereZustand();
         this.plugin.aktualisiereAktiveView();
         this.renderPanel(this.plugin.letzterBefund);
       });
@@ -1417,10 +1500,27 @@ class LesbarkeitPlugin extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    // Gespeicherte Werte in die Laufzeitfelder übernehmen — diese bleiben
+    // die Quelle der Wahrheit, die Settings sind nur ihre Ablage.
+    this.zielZeichen = Number(this.settings.zielZeichen) || 0;
+    this.zielTeaserZeichen = Number(this.settings.zielTeaserZeichen) || 0;
+    this.deaktiviert = new Set(this.settings.deaktivierteKategorien || []);
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  // Laufzeitstand einsammeln und ablegen. Wird nach jeder Änderung in der
+  // Sidebar aufgerufen, damit Zielwerte und abgeschaltete Kategorien einen
+  // Obsidian-Neustart überleben.
+  speichereZustand() {
+    this.settings.zielZeichen = this.zielZeichen;
+    this.settings.zielTeaserZeichen = this.zielTeaserZeichen;
+    this.settings.deaktivierteKategorien = [...this.deaktiviert];
+    this.saveSettings().catch(e =>
+      console.error("TOL Textanalyse: Einstellungen konnten nicht gespeichert werden.", e)
+    );
   }
 
   istDraft() {
