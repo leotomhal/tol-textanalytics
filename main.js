@@ -82,26 +82,42 @@ const UEBERSCHRIFT_MAX_ZEICHEN = 80;
 // Sucht die erste H1-Überschrift ("# ...", nicht "##...") sowie den direkt
 // darauffolgenden Absatz, sofern dieser komplett als "**...**" gefettet ist
 // (= Teaser). Arbeitet auf dem Original-Text (nicht dem maskierten), damit
-// die Markdown-Syntax selbst erkennbar bleibt.
+// die Markdown-Syntax selbst erkennbar bleibt. Liefert neben dem reinen
+// Inhalt (ohne "# "/"**") auch dessen Start-/End-Position im Originaltext,
+// damit der Aufrufer bei Überschreitung im Editor markieren kann.
 function extrahiereUeberschriftUndTeaser(originalText) {
-  const zeilen = originalText.split(/\r?\n/);
-  let ueberschrift = null;
-  let ueberschriftZeile = -1;
-  for (let i = 0; i < zeilen.length; i++) {
-    const m = zeilen[i].match(/^#(?!#)\s+(.+?)\s*$/);
-    if (m) { ueberschrift = m[1]; ueberschriftZeile = i; break; }
-  }
-  if (ueberschrift === null) return { ueberschrift: null, teaser: null };
+  const leer = { ueberschrift: null, ueberschriftVon: -1, ueberschriftBis: -1, teaser: null, teaserVon: -1, teaserBis: -1 };
 
-  let teaser = null;
-  for (let i = ueberschriftZeile + 1; i < zeilen.length; i++) {
-    const zeile = zeilen[i].trim();
-    if (zeile === "") continue;
-    const m = zeile.match(/^\*\*(.+)\*\*$/);
-    teaser = m ? m[1] : null;
-    break;
+  const hm = /^#(?!#)[ \t]+(.+?)[ \t]*\r?$/m.exec(originalText);
+  if (!hm) return leer;
+
+  const ueberschrift = hm[1];
+  const ueberschriftVon = originalText.indexOf(ueberschrift, hm.index);
+  const ueberschriftBis = ueberschriftVon + ueberschrift.length;
+  const zeilenEnde = hm.index + hm[0].length; // Ende der Überschriftzeile, vor "\n"
+
+  // Nächste nicht-leere Zeile danach suchen
+  let pos = originalText[zeilenEnde] === "\n" ? zeilenEnde + 1 : zeilenEnde;
+  let teaser = null, teaserVon = -1, teaserBis = -1;
+  while (pos <= originalText.length) {
+    const nlIdx = originalText.indexOf("\n", pos);
+    const aktuelleZeilenEnde = nlIdx === -1 ? originalText.length : nlIdx;
+    const zeile = originalText.slice(pos, aktuelleZeilenEnde).replace(/\r$/, "");
+    const getrimmt = zeile.trim();
+    if (getrimmt !== "") {
+      const m = getrimmt.match(/^\*\*(.+)\*\*$/);
+      if (m) {
+        teaser = m[1];
+        teaserVon = originalText.indexOf(teaser, pos);
+        teaserBis = teaserVon + teaser.length;
+      }
+      break;
+    }
+    if (nlIdx === -1) break;
+    pos = nlIdx + 1;
   }
-  return { ueberschrift, teaser };
+
+  return { ueberschrift, ueberschriftVon, ueberschriftBis, teaser, teaserVon, teaserBis };
 }
 
 const WIEDERHOLUNG_MIN_WORTLAENGE = 4;
@@ -379,10 +395,10 @@ function analysiereText(originalText) {
   {
     const struktur = extrahiereUeberschriftUndTeaser(originalText);
     ergebnis.ueberschrift = struktur.ueberschrift !== null
-      ? { text: struktur.ueberschrift, laenge: struktur.ueberschrift.length }
+      ? { text: struktur.ueberschrift, laenge: struktur.ueberschrift.length, von: struktur.ueberschriftVon, bis: struktur.ueberschriftBis }
       : null;
     ergebnis.teaser = struktur.teaser !== null
-      ? { text: struktur.teaser, laenge: struktur.teaser.length }
+      ? { text: struktur.teaser, laenge: struktur.teaser.length, von: struktur.teaserVon, bis: struktur.teaserBis }
       : null;
   }
 
@@ -872,6 +888,30 @@ function baueExtension(plugin) {
             decos.push(
               Decoration.mark({ class: "cm-lesbarkeit-overlimit" })
                 .range(plugin.zielZeichen, text.length)
+            );
+          } catch(e) {}
+        }
+
+        // Überschrift (H1) zu lang
+        if (ergebnis.ueberschrift && ergebnis.ueberschrift.laenge > UEBERSCHRIFT_MAX_ZEICHEN) {
+          try {
+            decos.push(
+              Decoration.mark({
+                class: "cm-lesbarkeit-overlimit",
+                attributes: { "data-lesbarkeit-tooltip": `Überschrift zu lang: ${ergebnis.ueberschrift.laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} Zeichen` }
+              }).range(ergebnis.ueberschrift.von + UEBERSCHRIFT_MAX_ZEICHEN, ergebnis.ueberschrift.bis)
+            );
+          } catch(e) {}
+        }
+
+        // Teaser zu lang (nur wenn Ziel gesetzt)
+        if (ergebnis.teaser && plugin.zielTeaserZeichen > 0 && ergebnis.teaser.laenge > plugin.zielTeaserZeichen) {
+          try {
+            decos.push(
+              Decoration.mark({
+                class: "cm-lesbarkeit-overlimit",
+                attributes: { "data-lesbarkeit-tooltip": `Teaser zu lang: ${ergebnis.teaser.laenge} / ${plugin.zielTeaserZeichen} Zeichen` }
+              }).range(ergebnis.teaser.von + plugin.zielTeaserZeichen, ergebnis.teaser.bis)
             );
           } catch(e) {}
         }
