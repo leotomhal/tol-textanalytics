@@ -80,11 +80,12 @@ const EIGENNAMEN_AUSNAHMEN_WIEDERHOLUNG = new Set([
 const UEBERSCHRIFT_MAX_ZEICHEN = 80;
 
 // Sucht die erste H1-Überschrift ("# ...", nicht "##...") sowie den direkt
-// darauffolgenden Absatz, sofern dieser komplett als "**...**" gefettet ist
-// (= Teaser). Arbeitet auf dem Original-Text (nicht dem maskierten), damit
-// die Markdown-Syntax selbst erkennbar bleibt. Liefert neben dem reinen
-// Inhalt (ohne "# "/"**") auch dessen Start-/End-Position im Originaltext,
-// damit der Aufrufer bei Überschreitung im Editor markieren kann.
+// darauffolgenden Absatz, sofern dieser (auch mehrzeilig) mit "**" beginnt
+// und endet (= Teaser). Arbeitet auf dem Original-Text (nicht dem
+// maskierten), damit die Markdown-Syntax selbst erkennbar bleibt. Liefert
+// neben dem reinen Inhalt (ohne "# "/"**") auch dessen Start-/End-Position
+// im Originaltext, damit der Aufrufer bei Überschreitung im Editor
+// markieren kann.
 function extrahiereUeberschriftUndTeaser(originalText) {
   const leer = { ueberschrift: null, ueberschriftVon: -1, ueberschriftBis: -1, teaser: null, teaserVon: -1, teaserBis: -1 };
 
@@ -96,25 +97,45 @@ function extrahiereUeberschriftUndTeaser(originalText) {
   const ueberschriftBis = ueberschriftVon + ueberschrift.length;
   const zeilenEnde = hm.index + hm[0].length; // Ende der Überschriftzeile, vor "\n"
 
-  // Nächste nicht-leere Zeile danach suchen
+  // Führende Leerzeilen nach der Überschrift überspringen, dann den ganzen
+  // Absatz (durchgehende nicht-leere Zeilen, auch mehrzeilig) einsammeln.
   let pos = originalText[zeilenEnde] === "\n" ? zeilenEnde + 1 : zeilenEnde;
-  let teaser = null, teaserVon = -1, teaserBis = -1;
-  while (pos <= originalText.length) {
+  while (pos < originalText.length) {
     const nlIdx = originalText.indexOf("\n", pos);
     const aktuelleZeilenEnde = nlIdx === -1 ? originalText.length : nlIdx;
     const zeile = originalText.slice(pos, aktuelleZeilenEnde).replace(/\r$/, "");
-    const getrimmt = zeile.trim();
-    if (getrimmt !== "") {
-      const m = getrimmt.match(/^\*\*(.+)\*\*$/);
-      if (m) {
-        teaser = m[1];
-        teaserVon = originalText.indexOf(teaser, pos);
-        teaserBis = teaserVon + teaser.length;
-      }
-      break;
-    }
-    if (nlIdx === -1) break;
+    if (zeile.trim() !== "") break;
+    if (nlIdx === -1) { pos = originalText.length; break; }
     pos = nlIdx + 1;
+  }
+  const absatzStart = pos;
+
+  let absatzEnde = absatzStart;
+  {
+    let cursor = absatzStart;
+    while (cursor < originalText.length) {
+      const nlIdx = originalText.indexOf("\n", cursor);
+      const aktuelleZeilenEnde = nlIdx === -1 ? originalText.length : nlIdx;
+      const zeile = originalText.slice(cursor, aktuelleZeilenEnde).replace(/\r$/, "");
+      if (zeile.trim() === "") { absatzEnde = cursor; break; }
+      absatzEnde = aktuelleZeilenEnde;
+      if (nlIdx === -1) break;
+      cursor = nlIdx + 1;
+    }
+  }
+
+  // Absatz gilt als Teaser, wenn er (nach Trimmen) mit "**" beginnt und
+  // endet – unabhängig davon, ob er ein- oder mehrzeilig ist.
+  let teaser = null, teaserVon = -1, teaserBis = -1;
+  if (absatzEnde > absatzStart) {
+    const absatz = originalText.slice(absatzStart, absatzEnde);
+    const fuehrendeLeerzeichen = absatz.length - absatz.replace(/^\s+/, "").length;
+    const getrimmt = absatz.trim();
+    if (getrimmt.length > 4 && getrimmt.startsWith("**") && getrimmt.endsWith("**")) {
+      teaserVon = absatzStart + fuehrendeLeerzeichen + 2;
+      teaserBis = teaserVon + (getrimmt.length - 4);
+      teaser = originalText.slice(teaserVon, teaserBis);
+    }
   }
 
   return { ueberschrift, ueberschriftVon, ueberschriftBis, teaser, teaserVon, teaserBis };
