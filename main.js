@@ -561,9 +561,6 @@ class LesbarkeitSidebarView extends ItemView {
 
     if (!this.plugin.istDraft()) return;
 
-    // Titel
-    container.createEl("h4", { text: "📖 TOL Textanalyse" });
-
     // ── Tab-Leiste ──
     const tabBar = container.createDiv("lesbarkeit-tabs");
     const statsTab = tabBar.createDiv({ cls: "lesbarkeit-tab" + (this.aktiverTab === "stats" ? " aktiv" : "") });
@@ -590,9 +587,55 @@ class LesbarkeitSidebarView extends ItemView {
   }
 
   renderStatsTab(container, ergebnis) {
-    // ── Struktur: Überschrift & Teaser ──
+    // ── Struktur: Zeichenzahl, Überschrift & Teaser ──
     const strukturSection = container.createDiv("lesbarkeit-section lesbarkeit-section-gross");
     strukturSection.createDiv({ cls: "lesbarkeit-section-title", text: "Länge Überschrift & Teaser" });
+
+    // Zeichenzahl (Ziel für den gesamten Text), einzeilig wie die Zeilen darunter.
+    const zeichenRow = strukturSection.createDiv("lesbarkeit-target-row");
+    zeichenRow.createDiv({ cls: "lesbarkeit-target-label", text: "Zeichenzahl" });
+    const zeichenInp = zeichenRow.createEl("input", { type: "number", placeholder: "z.B. 500" });
+    zeichenInp.value = this.plugin.zielZeichen > 0 ? String(this.plugin.zielZeichen) : "";
+    zeichenInp.min = "0";
+
+    // Bewusst kein "input"-Listener, der bei jedem Tastendruck übernimmt:
+    // aktualisiereAktiveView() stößt eine CM6-Neuberechnung an, die über
+    // aktualisierePanel() renderPanel() aufruft — das baut die Sidebar
+    // (inkl. dieses Eingabefelds) komplett neu auf und der Fokus geht
+    // verloren, sodass nach der ersten Ziffer nichts mehr ankommt. Übernahme
+    // deshalb explizit per Button oder Enter.
+    const zeichenBtn = zeichenRow.createEl("button", {
+      text: "Übernehmen",
+      cls: "lesbarkeit-tag-btn",
+    });
+    zeichenBtn.type = "button";
+
+    const zeichenStatus = zeichenRow.createDiv("lesbarkeit-target-status");
+
+    const aktualisiereZeichenStatus = () => {
+      const zeichen = ergebnis ? ergebnis.zeichen : 0;
+      const ziel = this.plugin.zielZeichen;
+      if (ziel <= 0) { zeichenStatus.setText(""); zeichenStatus.className = "lesbarkeit-target-status"; return; }
+      if (zeichen <= ziel) {
+        zeichenStatus.setText(`${zeichen} / ${ziel} ✓`);
+        zeichenStatus.className = "lesbarkeit-target-status ok";
+      } else {
+        zeichenStatus.setText(`${zeichen} / ${ziel} ✗ (+${zeichen - ziel})`);
+        zeichenStatus.className = "lesbarkeit-target-status over";
+      }
+    };
+    aktualisiereZeichenStatus();
+
+    const zeichenUebernehmen = () => {
+      const val = parseInt(zeichenInp.value, 10);
+      this.plugin.zielZeichen = isNaN(val) ? 0 : val;
+      this.plugin.aktualisiereAktiveView();
+      aktualisiereZeichenStatus();
+    };
+    zeichenBtn.addEventListener("click", zeichenUebernehmen);
+    zeichenInp.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") zeichenUebernehmen();
+    });
 
     // Überschrift (H1): feste Grenze, keine Einstellung nötig.
     const ueberschriftRow = strukturSection.createDiv("lesbarkeit-target-row");
@@ -735,53 +778,6 @@ class LesbarkeitSidebarView extends ItemView {
       });
     }
 
-    // ── Zielzeichenzahl ──
-    const targetSection = container.createDiv("lesbarkeit-section");
-    targetSection.createDiv({ cls: "lesbarkeit-section-title", text: "Zielzeichenzahl" });
-
-    const targetRow = targetSection.createDiv("lesbarkeit-target-row");
-    const inp = targetRow.createEl("input", { type: "number", placeholder: "z.B. 500" });
-    inp.value = this.plugin.zielZeichen > 0 ? String(this.plugin.zielZeichen) : "";
-    inp.min = "0";
-
-    // Bewusst kein "input"-Listener, der bei jedem Tastendruck übernimmt:
-    // aktualisiereAktiveView() stößt eine CM6-Neuberechnung an, die über
-    // aktualisierePanel() renderPanel() aufruft — das baut die Sidebar
-    // (inkl. dieses Eingabefelds) komplett neu auf und der Fokus geht
-    // verloren, sodass nach der ersten Ziffer nichts mehr ankommt. Übernahme
-    // deshalb explizit per Button oder Enter.
-    const uebernehmenBtn = targetRow.createEl("button", {
-      text: "Übernehmen",
-      cls: "lesbarkeit-tag-btn",
-    });
-    uebernehmenBtn.type = "button";
-
-    const status = targetRow.createDiv("lesbarkeit-target-status");
-
-    const aktualisiereStatus = () => {
-      const zeichen = ergebnis ? ergebnis.zeichen : 0;
-      const ziel = this.plugin.zielZeichen;
-      if (ziel <= 0) { status.setText(""); status.className = "lesbarkeit-target-status"; return; }
-      if (zeichen <= ziel) {
-        status.setText(`${zeichen} / ${ziel} ✓`);
-        status.className = "lesbarkeit-target-status ok";
-      } else {
-        status.setText(`${zeichen} / ${ziel} ✗ (+${zeichen - ziel})`);
-        status.className = "lesbarkeit-target-status over";
-      }
-    };
-    aktualisiereStatus();
-
-    const uebernehmen = () => {
-      const val = parseInt(inp.value, 10);
-      this.plugin.zielZeichen = isNaN(val) ? 0 : val;
-      this.plugin.aktualisiereAktiveView();
-      aktualisiereStatus();
-    };
-    uebernehmenBtn.addEventListener("click", uebernehmen);
-    inp.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") uebernehmen();
-    });
   }
 
   renderIssuesTab(container, ergebnis) {
