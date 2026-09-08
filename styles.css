@@ -188,10 +188,10 @@
 .lesbarkeit-section-gross .lesbarkeit-target-row {
   margin-bottom: 10px;
 }
-/* Trennlinie zwischen den Zeilen (Zeichenzahl / Überschrift / Teaser) */
-.lesbarkeit-section-gross .lesbarkeit-target-row + .lesbarkeit-target-row {
-  border-top: 1px solid var(--background-modifier-border);
-  padding-top: 10px;
+/* Trennlinie unter dem Block, zur Abgrenzung von "Textqualität" */
+.lesbarkeit-section-gross {
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 12px;
 }
 
 /* ── CodeMirror Decorations ── */
