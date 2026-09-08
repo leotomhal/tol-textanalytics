@@ -974,7 +974,7 @@ class LesbarkeitPlugin extends Plugin {
   async onload() {
     this.deaktiviert = new Set();
     this.zielZeichen = 0;
-    this.zielTeaserZeichen = 0;
+    this.zielTeaserZeichen = 480;
     this.letzterBefund = null;
     this.tooltipEl = null;
     this.aktiveDatei = null;
