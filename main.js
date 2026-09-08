@@ -734,6 +734,7 @@ class LesbarkeitSidebarView extends ItemView {
 
     // Teaser (erster gefetteter Absatz nach der H1): Ziel selbst einstellbar.
     const teaserRow = strukturSection.createDiv("lesbarkeit-target-row");
+    teaserRow.createDiv({ cls: "lesbarkeit-target-label", text: "Teaser" });
     const teaserInp = teaserRow.createEl("input", { type: "number", placeholder: "z.B. 150" });
     teaserInp.value = this.plugin.zielTeaserZeichen > 0 ? String(this.plugin.zielTeaserZeichen) : "";
     teaserInp.min = "0";
