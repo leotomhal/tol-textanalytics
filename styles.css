@@ -141,6 +141,11 @@
 .lesbarkeit-target-status.ok { background: #4caf5022; color: #4caf50; }
 .lesbarkeit-target-status.over { background: #f4433622; color: #f44336; }
 
+.lesbarkeit-target-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 /* ── CodeMirror Decorations ── */
 
 /* Lange Sätze */

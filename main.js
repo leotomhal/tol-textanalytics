@@ -76,6 +76,34 @@ const EIGENNAMEN_AUSNAHMEN_WIEDERHOLUNG = new Set([
   "wissenschaftlerinnen","wissenschaftlern","halle","wittenberg",
 ]);
 
+// Maximale Zeichenzahl der ersten H1-Überschrift ("# ..."), fest vorgegeben.
+const UEBERSCHRIFT_MAX_ZEICHEN = 80;
+
+// Sucht die erste H1-Überschrift ("# ...", nicht "##...") sowie den direkt
+// darauffolgenden Absatz, sofern dieser komplett als "**...**" gefettet ist
+// (= Teaser). Arbeitet auf dem Original-Text (nicht dem maskierten), damit
+// die Markdown-Syntax selbst erkennbar bleibt.
+function extrahiereUeberschriftUndTeaser(originalText) {
+  const zeilen = originalText.split(/\r?\n/);
+  let ueberschrift = null;
+  let ueberschriftZeile = -1;
+  for (let i = 0; i < zeilen.length; i++) {
+    const m = zeilen[i].match(/^#(?!#)\s+(.+?)\s*$/);
+    if (m) { ueberschrift = m[1]; ueberschriftZeile = i; break; }
+  }
+  if (ueberschrift === null) return { ueberschrift: null, teaser: null };
+
+  let teaser = null;
+  for (let i = ueberschriftZeile + 1; i < zeilen.length; i++) {
+    const zeile = zeilen[i].trim();
+    if (zeile === "") continue;
+    const m = zeile.match(/^\*\*(.+)\*\*$/);
+    teaser = m ? m[1] : null;
+    break;
+  }
+  return { ueberschrift, teaser };
+}
+
 const WIEDERHOLUNG_MIN_WORTLAENGE = 4;
 // Abstand in Wörtern, ab dem zwei Vorkommen desselben Wortes nicht mehr als
 // Wiederholung gelten (Konzept-Feedback: ~50 Wörter ≈ 2–3 Sätze).
@@ -346,6 +374,17 @@ function analysiereText(originalText) {
   ergebnis.saetze = (text.match(/[.!?…:]+/g) || []).length;
   ergebnis.lesezeit = Math.ceil(ergebnis.woerter / 200);
   ergebnis.flesch = berechneFlesch(text);
+
+  // Struktur-Check: erste H1-Überschrift + direkt folgender Teaser (fett)
+  {
+    const struktur = extrahiereUeberschriftUndTeaser(originalText);
+    ergebnis.ueberschrift = struktur.ueberschrift !== null
+      ? { text: struktur.ueberschrift, laenge: struktur.ueberschrift.length }
+      : null;
+    ergebnis.teaser = struktur.teaser !== null
+      ? { text: struktur.teaser, laenge: struktur.teaser.length }
+      : null;
+  }
 
   let m;
 
@@ -633,6 +672,76 @@ class LesbarkeitSidebarView extends ItemView {
     inp.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter") uebernehmen();
     });
+
+    // ── Struktur: Überschrift & Teaser ──
+    const strukturSection = container.createDiv("lesbarkeit-section");
+    strukturSection.createDiv({ cls: "lesbarkeit-section-title", text: "Überschrift & Teaser" });
+
+    // Überschrift (H1): feste Grenze, keine Einstellung nötig.
+    const ueberschriftRow = strukturSection.createDiv("lesbarkeit-target-row");
+    ueberschriftRow.createDiv({ cls: "lesbarkeit-target-label", text: "Überschrift (H1)" });
+    const ueberschriftStatus = ueberschriftRow.createDiv("lesbarkeit-target-status");
+    if (!ergebnis || !ergebnis.ueberschrift) {
+      ueberschriftStatus.setText(ergebnis ? "Keine H1 gefunden" : "–");
+      ueberschriftStatus.className = "lesbarkeit-target-status";
+    } else {
+      const laenge = ergebnis.ueberschrift.laenge;
+      if (laenge <= UEBERSCHRIFT_MAX_ZEICHEN) {
+        ueberschriftStatus.setText(`${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} ✓`);
+        ueberschriftStatus.className = "lesbarkeit-target-status ok";
+      } else {
+        ueberschriftStatus.setText(`${laenge} / ${UEBERSCHRIFT_MAX_ZEICHEN} ✗ (+${laenge - UEBERSCHRIFT_MAX_ZEICHEN})`);
+        ueberschriftStatus.className = "lesbarkeit-target-status over";
+      }
+    }
+
+    // Teaser (erster gefetteter Absatz nach der H1): Ziel selbst einstellbar.
+    const teaserRow = strukturSection.createDiv("lesbarkeit-target-row");
+    const teaserInp = teaserRow.createEl("input", { type: "number", placeholder: "z.B. 150" });
+    teaserInp.value = this.plugin.zielTeaserZeichen > 0 ? String(this.plugin.zielTeaserZeichen) : "";
+    teaserInp.min = "0";
+
+    const teaserBtn = teaserRow.createEl("button", {
+      text: "Übernehmen",
+      cls: "lesbarkeit-tag-btn",
+    });
+    teaserBtn.type = "button";
+
+    const teaserStatus = teaserRow.createDiv("lesbarkeit-target-status");
+
+    const aktualisiereTeaserStatus = () => {
+      if (!ergebnis || !ergebnis.teaser) {
+        teaserStatus.setText(ergebnis ? "Kein Teaser (** ** direkt nach H1) gefunden" : "–");
+        teaserStatus.className = "lesbarkeit-target-status";
+        return;
+      }
+      const laenge = ergebnis.teaser.laenge;
+      const ziel = this.plugin.zielTeaserZeichen;
+      if (ziel <= 0) {
+        teaserStatus.setText(`${laenge} Zeichen`);
+        teaserStatus.className = "lesbarkeit-target-status";
+        return;
+      }
+      if (laenge <= ziel) {
+        teaserStatus.setText(`${laenge} / ${ziel} ✓`);
+        teaserStatus.className = "lesbarkeit-target-status ok";
+      } else {
+        teaserStatus.setText(`${laenge} / ${ziel} ✗ (+${laenge - ziel})`);
+        teaserStatus.className = "lesbarkeit-target-status over";
+      }
+    };
+    aktualisiereTeaserStatus();
+
+    const teaserUebernehmen = () => {
+      const val = parseInt(teaserInp.value, 10);
+      this.plugin.zielTeaserZeichen = isNaN(val) ? 0 : val;
+      this.plugin.aktualisiereAktiveView();
+      aktualisiereTeaserStatus();
+    };
+    teaserBtn.addEventListener("click", teaserUebernehmen);
+    teaserInp.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") teaserUebernehmen();
+    });
   }
 
   renderIssuesTab(container, ergebnis) {
@@ -804,6 +913,7 @@ class LesbarkeitPlugin extends Plugin {
   async onload() {
     this.deaktiviert = new Set();
     this.zielZeichen = 0;
+    this.zielTeaserZeichen = 0;
     this.letzterBefund = null;
     this.tooltipEl = null;
     this.aktiveDatei = null;
