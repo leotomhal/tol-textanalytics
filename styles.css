@@ -147,7 +147,8 @@
   color: var(--text-muted);
 }
 
-/* Teaser-Zielwert-Umschalter */
+/* Teaser-Zielwert-Umschalter (eigener Klassenname: .lesbarkeit-toggle-btn
+   ist weiter unten schon für die Voll-Breite-Buttons vergeben) */
 .lesbarkeit-toggle-group {
   display: flex;
   border: 1px solid var(--background-modifier-border);
@@ -155,7 +156,7 @@
   overflow: hidden;
 }
 
-.lesbarkeit-toggle-btn {
+.lesbarkeit-segment-btn {
   padding: 4px 10px;
   font-size: 13px;
   border: none;
@@ -164,9 +165,9 @@
   color: var(--text-normal);
   cursor: pointer;
 }
-.lesbarkeit-toggle-btn:last-child { border-right: none; }
-.lesbarkeit-toggle-btn:hover { background: var(--background-modifier-hover); }
-.lesbarkeit-toggle-btn.aktiv {
+.lesbarkeit-segment-btn:last-child { border-right: none; }
+.lesbarkeit-segment-btn:hover { background: var(--background-modifier-hover); }
+.lesbarkeit-segment-btn.aktiv {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }
@@ -182,7 +183,7 @@
   font-size: 14px;
   padding: 4px 10px;
 }
-.lesbarkeit-section-gross .lesbarkeit-toggle-btn {
+.lesbarkeit-section-gross .lesbarkeit-segment-btn {
   font-size: 15px;
   padding: 6px 14px;
 }
@@ -452,4 +453,85 @@
 .cm-lesbarkeit-melodie {
   background-color: rgba(233, 30, 99, 0.08);
   border-bottom: 2px solid rgba(233, 30, 99, 0.5);
+}
+
+/* Perfekt */
+.cm-lesbarkeit-perfekt {
+  background-color: rgba(0, 137, 123, 0.13);
+  border-bottom: 2px solid rgba(0, 137, 123, 0.55);
+}
+
+/* ── Metrik-Zeilen (Verständlichkeit, Satzbau) ── */
+.lesbarkeit-metrik-box {
+  margin-top: 6px;
+}
+
+.lesbarkeit-metrik-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.lesbarkeit-metrik-label {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.lesbarkeit-metrik-wert {
+  color: var(--text-normal);
+  font-weight: 500;
+  text-align: right;
+}
+.lesbarkeit-metrik-wert.score-gut { color: #4caf50; }
+.lesbarkeit-metrik-wert.score-mittel { color: #ff9800; }
+.lesbarkeit-metrik-wert.score-schwer { color: #f44336; }
+
+/* ── Satzlängen-Histogramm ── */
+.lesbarkeit-histogramm {
+  margin: 8px 0 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lesbarkeit-histo-zeile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.lesbarkeit-histo-label {
+  width: 38px;
+  text-align: right;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.lesbarkeit-histo-balken-box {
+  flex: 1;
+  background: var(--background-secondary);
+  border-radius: 3px;
+  height: 12px;
+  overflow: hidden;
+}
+
+.lesbarkeit-histo-balken {
+  height: 100%;
+  background: #4caf5099;
+  border-radius: 3px;
+  min-width: 0;
+  transition: width 0.15s;
+}
+.lesbarkeit-histo-balken.mittel { background: #ff980099; }
+.lesbarkeit-histo-balken.lang { background: #f4433699; }
+
+.lesbarkeit-histo-wert {
+  width: 20px;
+  text-align: right;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }

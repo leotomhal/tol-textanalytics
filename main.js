@@ -185,7 +185,7 @@ function zaehleSilben(wort) {
 // ─────────────────────────────────────────────
 function berechneFlesch(text) {
   const saetze = text.split(/[.!?…:]+/).filter(s => s.trim().length > 2);
-  const woerter = text.match(/\b\w+\b/g) || [];
+  const woerter = text.match(RE_WORT) || [];
   if (saetze.length === 0 || woerter.length === 0) return null;
 
   const asl = woerter.length / saetze.length;
@@ -235,7 +235,7 @@ function berechneSprachmelodie(text) {
     const inhalt = a[0];
     const saetze = inhalt.split(/[.!?…:]+/).map(s => s.trim()).filter(s => s.length > 5);
     if (saetze.length < 3) continue; // Absatz mit < 3 Sätzen nicht bewerten
-    const laengen = saetze.map(s => (s.match(/\b\w+\b/g) || []).length).filter(l => l > 0);
+    const laengen = saetze.map(s => (s.match(RE_WORT) || []).length).filter(l => l > 0);
     absaetze.push({ von: a.index, bis: a.index + inhalt.length, stddev: stdAbweichung(laengen), laengen });
   }
 
@@ -271,6 +271,177 @@ function scoreLabel(score) {
   if (score >= 40) return { label: "Verbesserbar", cls: "score-mittel" };
   return { label: "Viele Issues", cls: "score-schwer" };
 }
+
+// ─────────────────────────────────────────────
+// WIENER SACHTEXTFORMEL (WSTF 1) — Konzept 3.2
+// WSTF = 0,1935·MS + 0,1672·SL + 0,1297·IW − 0,0327·ES − 0,875
+// Ergebnis ist eine Schulstufe (4–15).
+//
+// Einschränkung: Die im Konzept vorgesehene Fachwort-Korrektur fehlt. Sie
+// setzt die DeReWo-Frequenzliste voraus, die hier nicht vorliegt. Bei
+// fachwortdichten Texten fällt die Schulstufe deshalb systematisch zu hoch
+// aus — drei der vier Terme messen Wortlänge, nicht Satzbau.
+// ─────────────────────────────────────────────
+function berechneWstf(text) {
+  const saetze = text.split(/[.!?…:]+/).filter(s => (s.match(RE_WORT) || []).length > 0);
+  const woerter = text.match(RE_WORT) || [];
+  if (saetze.length === 0 || woerter.length < 20) return null;
+
+  const silben = woerter.map(zaehleSilben);
+  const ms = silben.filter(s => s >= 3).length / woerter.length * 100;
+  const es = silben.filter(s => s === 1).length / woerter.length * 100;
+  const iw = woerter.filter(w => w.length > 6).length / woerter.length * 100;
+  const sl = woerter.length / saetze.length;
+
+  const stufe = 0.1935 * ms + 0.1672 * sl + 0.1297 * iw - 0.0327 * es - 0.875;
+  return Math.round(Math.max(4, Math.min(15, stufe)) * 10) / 10;
+}
+
+function wstfLabel(stufe) {
+  if (stufe === null) return { label: "–", cls: "" };
+  if (stufe <= 8) return { label: "leicht verständlich", cls: "score-gut" };
+  if (stufe <= 10) return { label: "mittleres Niveau", cls: "score-gut" };
+  if (stufe <= 12) return { label: "anspruchsvoll", cls: "score-mittel" };
+  return { label: "Fachpublikum", cls: "score-schwer" };
+}
+
+// LIX als zweite Meinung (Konzept 3.2): mittlere Satzlänge + Anteil Wörter
+// über 6 Buchstaben. Divergieren WSTF und LIX stark, ist das selbst ein Signal.
+function berechneLix(text) {
+  const saetze = text.split(/[.!?…:]+/).filter(s => (s.match(RE_WORT) || []).length > 0);
+  const woerter = text.match(RE_WORT) || [];
+  if (saetze.length === 0 || woerter.length < 20) return null;
+  const asl = woerter.length / saetze.length;
+  const lw = woerter.filter(w => w.length > 6).length / woerter.length * 100;
+  return Math.round(asl + lw);
+}
+
+function lixLabel(lix) {
+  if (lix === null) return { label: "–", cls: "" };
+  if (lix < 40) return { label: "leicht", cls: "score-gut" };
+  if (lix < 50) return { label: "mittel", cls: "score-gut" };
+  if (lix < 60) return { label: "schwer", cls: "score-mittel" };
+  return { label: "sehr schwer", cls: "score-schwer" };
+}
+
+// ─────────────────────────────────────────────
+// SATZBAU-KENNZAHLEN (Konzept 3.3)
+// ─────────────────────────────────────────────
+function berechneSatzbau(text) {
+  const laengen = (text.match(/[^.!?…:]+[.!?…:]+/g) || [])
+    .map(s => (s.match(RE_WORT) || []).length)
+    .filter(l => l > 0);
+  if (laengen.length === 0) return null;
+
+  const sortiert = [...laengen].sort((a, b) => a - b);
+  const mitte = Math.floor(sortiert.length / 2);
+  const median = sortiert.length % 2 === 0
+    ? Math.round((sortiert[mitte - 1] + sortiert[mitte]) / 2)
+    : sortiert[mitte];
+
+  return {
+    laengen,
+    median,
+    mittel: Math.round(laengen.reduce((a, b) => a + b, 0) / laengen.length),
+    max: sortiert[sortiert.length - 1],
+    ueber20: Math.round(laengen.filter(l => l > 20).length / laengen.length * 100),
+    ueber30: Math.round(laengen.filter(l => l > 30).length / laengen.length * 100),
+  };
+}
+
+// Erster Satz separat (Konzept 3.3): Er zählt in Pressetexten überproportional.
+function analysiereErstenSatz(text) {
+  const m = /[^.!?…:]+[.!?…:]+/.exec(text);
+  if (!m) return null;
+  const satz = m[0];
+  const woerter = (satz.match(RE_WORT) || []).length;
+  if (woerter === 0) return null;
+
+  const nebensatzEinleiter = /\b(dass|weil|obwohl|während|damit|wenn|falls|sobald|nachdem|bevor|indem|sofern|ob|wobei|sodass)\b/gi;
+  return {
+    von: m.index,
+    bis: m.index + satz.length,
+    woerter,
+    kommata: (satz.match(/,/g) || []).length,
+    nebensaetze: (satz.match(nebensatzEinleiter) || []).length,
+    passiv: new RegExp(PASSIV_REGEX.source, "i").test(satz)
+      || new RegExp(PASSIV_INVERS_REGEX.source, "i").test(satz),
+  };
+}
+
+// ─────────────────────────────────────────────
+// NOMINALSTIL & STRECKVERBEN (Konzept 3.6)
+// ─────────────────────────────────────────────
+// -ismus ist bewusst nicht dabei: Mechanismus, Organismus, Journalismus sind
+// echte Substantive, keine Verbalisierungen — fast nur Fehlalarme.
+const NOMINALSTIL_SUFFIXE = /(ierung|ung|heit|keit|tion|nis|schaft)$/i;
+
+// Echte Substantive, die zufällig auf einen Nominalstil-Suffix enden und
+// keine Verbalisierung sind. Ohne diese Liste ist die Kategorie unbrauchbar.
+const NOMINALSTIL_AUSNAHMEN = new Set([
+  "zeitung", "wohnung", "ordnung", "rechnung", "nahrung", "kleidung",
+  "umgebung", "regierung", "verwaltung", "sitzung", "leitung", "richtung",
+  "meinung", "erfahrung", "erinnerung", "bedingung", "hoffnung", "übung",
+  "nation", "station", "position", "situation", "region", "redaktion",
+  "portion", "tradition", "institution", "information", "generation",
+  "wissenschaft", "gesellschaft", "mannschaft", "landschaft", "botschaft",
+  "eigenschaft", "wirtschaft", "herrschaft", "freundschaft", "belegschaft",
+  "gemeinschaft", "partnerschaft", "wirtschaft", "verwandtschaft",
+  "freiheit", "gesundheit", "krankheit", "wahrheit", "sicherheit",
+  "möglichkeit", "wirklichkeit", "öffentlichkeit", "gelegenheit",
+  "ergebnis", "erlebnis", "verhältnis", "erkenntnis", "ereignis",
+  "gedächtnis", "geheimnis", "hindernis", "verzeichnis", "zeugnis",
+  "kenntnis", "bündnis",
+]);
+
+function istNominalstilAusnahme(klein) {
+  if (NOMINALSTIL_AUSNAHMEN.has(klein)) return true;
+  for (const ausnahme of NOMINALSTIL_AUSNAHMEN) {
+    if (klein.length > ausnahme.length && klein.endsWith(ausnahme)) return true;
+  }
+  return false;
+}
+
+// Funktionsverbgefüge/Streckverben — als Regex, damit Flexion mitgeht.
+const STRECKVERBEN = [
+  { re: /\bzur\s+Anwendung\s+(kommt|kommen|kam|kamen|gebracht|bringen)\b/gi, tipp: "anwenden" },
+  { re: /\bzum\s+Einsatz\s+(kommt|kommen|kam|kamen|gebracht|bringen)\b/gi, tipp: "einsetzen" },
+  { re: /\bin\s+Betracht\s+(ziehen|gezogen|zieht|zog)\b/gi, tipp: "erwägen" },
+  { re: /\bunter\s+Beweis\s+(stellen|gestellt|stellt|stellte)\b/gi, tipp: "beweisen" },
+  { re: /\b(Anwendung|Berücksichtigung|Verwendung|Anerkennung)\s+(findet|finden|fand|fanden|gefunden)\b/gi, tipp: "das passende Verb" },
+  { re: /\bin\s+Angriff\s+(nehmen|genommen|nimmt)\b/gi, tipp: "beginnen" },
+  { re: /\bzum\s+Abschluss\s+(bringen|gebracht|bringt)\b/gi, tipp: "abschließen" },
+  { re: /\beine?\s+Entscheidung\s+(treffen|getroffen|trifft|traf)\b/gi, tipp: "entscheiden" },
+  { re: /\bDurchführung\s+(von|der|des|eines|einer)\b/gi, tipp: "durchführen" },
+  { re: /\bunter\s+Berücksichtigung\b/gi, tipp: "berücksichtigen" },
+  { re: /\beine?\s+Untersuchung\s+(durchführen|durchgeführt|durchführt)\b/gi, tipp: "untersuchen" },
+];
+
+// ─────────────────────────────────────────────
+// PERFEKT (Konzept 3.6)
+// Bewusst nur "haben" + Partizip II: Bei "sein" + Partizip II ist ohne
+// Lexikon nicht zu trennen, ob Perfekt ("ist gefahren") oder Zustandspassiv
+// ("ist geplant") vorliegt — die Fehlerquote wäre höher als der Nutzen.
+// ─────────────────────────────────────────────
+const HABEN_FORM_REGEX = /\b(hat|haben|habe|hast|habt|hatte|hatten|hattest|hattet)\b/gi;
+// Partizip II ohne Lexikon: ge-Form, untrennbare Vorsilben und -iert.
+// Bei "über"/"unter" nur die schwache Form auf -t ("überprüft",
+// "unterstützt"), sonst würden Infinitive wie "unternehmen" oder
+// "überlegen" mitgehen.
+const PARTIZIP_II_QUELLE = "(?:ge[a-zäöüß]{2,}(?:t|en)|(?:be|ent|er|ver|zer|emp|miss)[a-zäöüß]{2,}(?:t|en)|(?:über|unter)[a-zäöüß]{2,}t|[a-zäöüß]{3,}iert)";
+const PERFEKT_MAX_ABSTAND = 12; // Token zwischen Hilfsverb und Partizip
+
+// ─────────────────────────────────────────────
+// ABKÜRZUNGEN (Konzept 3.6)
+// Großbuchstabenfolgen ≥ 2, die beim ersten Auftreten nicht aufgelöst werden.
+// ─────────────────────────────────────────────
+const ABKUERZUNG_REGEX = /\b[A-ZÄÖÜ]{2,}(?:-[A-ZÄÖÜ0-9]+)?\b/g;
+const ABKUERZUNG_BEKANNT = new Set([
+  "EU", "USA", "UNO", "UN", "WHO", "UNESCO", "OECD", "NATO", "DDR", "BRD",
+  "ARD", "ZDF", "PDF", "URL", "USB", "LED", "DNA", "RNA", "PC", "TV", "IT",
+  "KI", "ICE", "AGB", "GMBH", "EDV", "WLAN", "SMS", "ABC", "OK",
+]);
+const ROEMISCHE_ZAHL_REGEX = /^[IVXLCDM]+$/;
 
 // ─────────────────────────────────────────────
 // MARKDOWN-MASKIERUNG
@@ -328,6 +499,9 @@ const KATEGORIEN = [
   { id: "fuell",         label: "Füllwörter",              farbe: "#2196F3", cls: "cm-lesbarkeit-fuell" },
   { id: "wiederholung",  label: "Wortwiederholungen",     farbe: "#00BCD4", cls: "cm-lesbarkeit-wiederholung" },
   { id: "melodie",       label: "Monotone Satzlänge",     farbe: "#E91E63", cls: "cm-lesbarkeit-melodie" },
+  { id: "nominalstil",   label: "Nominalstil",            farbe: "#9C27B0", cls: "cm-lesbarkeit-nominal" },
+  { id: "perfekt",       label: "Perfekt",                farbe: "#00897B", cls: "cm-lesbarkeit-perfekt" },
+  { id: "abkuerzung",    label: "Abkürzungen",            farbe: "#795548", cls: "cm-lesbarkeit-abk" },
 ];
 
 // ─────────────────────────────────────────────
@@ -356,7 +530,10 @@ class LesbarkeitSettingTab extends PluginSettingTab {
 // PRECOMPILED REGEX-OBJEKTE (einmal definiert, mehrfach verwendet)
 // ─────────────────────────────────────────────
 const RE_SATZ = /[^.!?…:]+[.!?…:]+/g;
-const RE_WORT = /\b\w+\b/g;
+// Unicode-Wortmuster: \b\w+\b zerlegt im Deutschen jedes Wort mit Umlaut
+// oder ß in Fragmente ("für" → "f", "r"), was Wortzahl, Flesch, WSTF,
+// Satzlängen und Wiederholungen gleichermaßen verfälscht hat.
+const RE_WORT = /[\p{L}\p{N}]+/gu;
 
 // Zuschreibungs-Nachsatz bei Zitaten, z. B.:
 // „Das ist ein Statement.", sagt Prof. Dr. Mario Mustermann vom Institut
@@ -384,6 +561,10 @@ function analysiereText(originalText) {
     flesch: null,
     melodie: null,
     score: null,
+    wstf: null,
+    lix: null,
+    satzbau: null,
+    ersterSatz: null,
   };
 
   KATEGORIEN.forEach(k => ergebnis.zaehler[k.id] = 0);
@@ -413,6 +594,10 @@ function analysiereText(originalText) {
   ergebnis.saetze = (text.match(/[.!?…:]+/g) || []).length;
   ergebnis.lesezeit = Math.ceil(ergebnis.woerter / 200);
   ergebnis.flesch = berechneFlesch(text);
+  ergebnis.wstf = berechneWstf(text);
+  ergebnis.lix = berechneLix(text);
+  ergebnis.satzbau = berechneSatzbau(text);
+  ergebnis.ersterSatz = analysiereErstenSatz(text);
 
   // Struktur-Check: erste H1-Überschrift + direkt folgender Teaser (fett)
   {
@@ -526,6 +711,95 @@ function analysiereText(originalText) {
         absatz.von, absatz.bis,
         "melodie", "cm-lesbarkeit-melodie",
         `Monotone Satzlänge: Ø ${avg} Wörter, Abweichung ${absatz.stddev.toFixed(1)}`
+      );
+    }
+  }
+
+  // ── 6. Nominalstil & Streckverben (Konzept 3.6) ──
+  {
+    reset(RE_WORT);
+    let nm;
+    while ((nm = RE_WORT.exec(text)) !== null) {
+      const wort = nm[0];
+      if (wort.length < 7) continue;
+      if (!/^[A-ZÄÖÜ]/.test(wort)) continue; // nur Substantive
+      const klein = wort.toLowerCase();
+      // Ausnahmen greifen auch als Wortende, damit Komposita wie
+      // "Forschungsgemeinschaft" oder "Naturwissenschaft" nicht anschlagen.
+      if (istNominalstilAusnahme(klein)) continue;
+      if (!NOMINALSTIL_SUFFIXE.test(klein)) continue;
+      addMark(
+        nm.index, nm.index + wort.length,
+        "nominalstil", "cm-lesbarkeit-nominal",
+        `Nominalstil: „${wort}" — als Verb meist klarer`
+      );
+    }
+
+    for (const { re, tipp } of STRECKVERBEN) {
+      reset(re);
+      let sv;
+      while ((sv = re.exec(text)) !== null) {
+        addMark(
+          sv.index, sv.index + sv[0].length,
+          "nominalstil", "cm-lesbarkeit-nominal",
+          `Streckverb: „${sv[0].trim()}" — besser: ${tipp}`
+        );
+      }
+    }
+  }
+
+  // ── 7. Perfekt (Konzept 3.6) ──
+  {
+    const partizipRe = new RegExp("^" + PARTIZIP_II_QUELLE + "$", "i");
+    const tokenRe = /[\p{L}\p{N}]+/gu;
+    reset(RE_SATZ);
+    let ps;
+    while ((ps = RE_SATZ.exec(text)) !== null) {
+      const satz = ps[0];
+      const satzStart = ps.index;
+      reset(HABEN_FORM_REGEX);
+      let hv;
+      while ((hv = HABEN_FORM_REGEX.exec(satz)) !== null) {
+        tokenRe.lastIndex = hv.index + hv[0].length;
+        let tk, abstand = 0;
+        while (abstand < PERFEKT_MAX_ABSTAND && (tk = tokenRe.exec(satz)) !== null) {
+          abstand++;
+          const token = tk[0];
+          // "worden"/"geworden" = Passiv, nicht Perfekt
+          if (/^(worden|geworden)$/i.test(token)) break;
+          // Großgeschriebene Treffer sind Substantive ("Gebäuden", "Verfahren"),
+          // kein Partizip — sonst wäre die Fehlerquote zu hoch.
+          if (/^[A-ZÄÖÜ]/.test(token)) continue;
+          if (partizipRe.test(token)) {
+            addMark(
+              satzStart + hv.index, satzStart + tk.index + token.length,
+              "perfekt", "cm-lesbarkeit-perfekt",
+              `Perfekt: „${hv[0]} … ${token}" — im Nachrichtentext meist Präteritum`
+            );
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // ── 8. Nicht aufgelöste Abkürzungen (Konzept 3.6) ──
+  {
+    const gesehen = new Set();
+    reset(ABKUERZUNG_REGEX);
+    let ab;
+    while ((ab = ABKUERZUNG_REGEX.exec(text)) !== null) {
+      const abk = ab[0];
+      if (gesehen.has(abk)) continue; // nur das erste Auftreten zählt
+      gesehen.add(abk);
+      if (ABKUERZUNG_BEKANNT.has(abk)) continue;
+      if (ROEMISCHE_ZAHL_REGEX.test(abk)) continue;
+      // Aufgelöst, wenn das erste Auftreten in Klammern steht: "… (DFG)"
+      if (text[ab.index - 1] === "(" && text[ab.index + abk.length] === ")") continue;
+      addMark(
+        ab.index, ab.index + abk.length,
+        "abkuerzung", "cm-lesbarkeit-abk",
+        `Abkürzung „${abk}" wird beim ersten Auftreten nicht aufgelöst`
       );
     }
   }
@@ -670,7 +944,7 @@ class LesbarkeitSidebarView extends ItemView {
     const teaserButtons = TEASER_OPTIONEN.map(wert => {
       const btn = teaserSchalter.createEl("button", {
         text: String(wert),
-        cls: "lesbarkeit-toggle-btn" + (this.plugin.zielTeaserZeichen === wert ? " aktiv" : ""),
+        cls: "lesbarkeit-segment-btn" + (this.plugin.zielTeaserZeichen === wert ? " aktiv" : ""),
       });
       btn.type = "button";
       return btn;
@@ -730,6 +1004,35 @@ class LesbarkeitSidebarView extends ItemView {
       scoreMeta.setText("Kein Text geöffnet");
     }
 
+    // ── Verständlichkeit: WSTF (Hauptwert) + LIX (zweite Meinung) ──
+    const metrikBox = scoreSection.createDiv("lesbarkeit-metrik-box");
+
+    const wstfRow = metrikBox.createDiv("lesbarkeit-metrik-row");
+    wstfRow.createDiv({ cls: "lesbarkeit-metrik-label", text: "Wiener Sachtextformel" });
+    const wstfWert = wstfRow.createDiv("lesbarkeit-metrik-wert");
+    if (ergebnis && ergebnis.wstf !== null) {
+      const { label, cls } = wstfLabel(ergebnis.wstf);
+      wstfWert.setText(`Schulstufe ${String(ergebnis.wstf).replace(".", ",")} — ${label}`);
+      wstfWert.addClass(cls);
+      wstfRow.setAttribute(
+        "title",
+        "Ohne Fachwort-Korrektur (Frequenzliste fehlt): Bei vielen Fachbegriffen fällt die Schulstufe zu hoch aus."
+      );
+    } else {
+      wstfWert.setText("–");
+    }
+
+    const lixRow = metrikBox.createDiv("lesbarkeit-metrik-row");
+    lixRow.createDiv({ cls: "lesbarkeit-metrik-label", text: "LIX (zweite Meinung)" });
+    const lixWert = lixRow.createDiv("lesbarkeit-metrik-wert");
+    if (ergebnis && ergebnis.lix !== null) {
+      const { label, cls } = lixLabel(ergebnis.lix);
+      lixWert.setText(`${ergebnis.lix} — ${label}`);
+      lixWert.addClass(cls);
+    } else {
+      lixWert.setText("–");
+    }
+
     // ── Statistiken ──
     const statsSection = container.createDiv("lesbarkeit-section");
     statsSection.createDiv({ cls: "lesbarkeit-section-title", text: "Statistiken" });
@@ -753,6 +1056,70 @@ class LesbarkeitSidebarView extends ItemView {
       const box = grid.createDiv("lesbarkeit-stat");
       box.createDiv({ cls: "lesbarkeit-stat-value", text: String(s.val) });
       box.createDiv({ cls: "lesbarkeit-stat-label", text: s.lbl });
+    }
+
+    // ── Satzbau (Konzept 3.3) ──
+    const satzbauSection = container.createDiv("lesbarkeit-section");
+    satzbauSection.createDiv({ cls: "lesbarkeit-section-title", text: "Satzbau" });
+
+    if (!ergebnis || !ergebnis.satzbau) {
+      satzbauSection.createDiv({ cls: "lesbarkeit-issues-empty", text: "Kein Text geöffnet" });
+    } else {
+      const sb = ergebnis.satzbau;
+
+      const kennRow = satzbauSection.createDiv("lesbarkeit-metrik-row");
+      kennRow.createDiv({ cls: "lesbarkeit-metrik-label", text: "Satzlänge (Wörter)" });
+      kennRow.createDiv({
+        cls: "lesbarkeit-metrik-wert",
+        text: `Median ${sb.median} · Ø ${sb.mittel} · max. ${sb.max}`,
+      });
+
+      const anteilRow = satzbauSection.createDiv("lesbarkeit-metrik-row");
+      anteilRow.createDiv({ cls: "lesbarkeit-metrik-label", text: "Sätze über 20 / 30 Wörter" });
+      anteilRow.createDiv({ cls: "lesbarkeit-metrik-wert", text: `${sb.ueber20} % / ${sb.ueber30} %` });
+
+      // Histogramm der Satzlängen (bewusst als Divs statt Inline-SVG —
+      // gleiche Wirkung, weniger Code, theme-fähig über CSS-Variablen)
+      const BUCKETS = [
+        { label: "≤10", test: l => l <= 10 },
+        { label: "11–15", test: l => l > 10 && l <= 15 },
+        { label: "16–20", test: l => l > 15 && l <= 20 },
+        { label: "21–25", test: l => l > 20 && l <= 25 },
+        { label: "26–30", test: l => l > 25 && l <= 30 },
+        { label: "31–35", test: l => l > 30 && l <= 35 },
+        { label: ">35", test: l => l > 35 },
+      ];
+      const werte = BUCKETS.map(b => sb.laengen.filter(b.test).length);
+      const maxWert = Math.max(...werte, 1);
+
+      const histo = satzbauSection.createDiv("lesbarkeit-histogramm");
+      BUCKETS.forEach((b, i) => {
+        const zeile = histo.createDiv("lesbarkeit-histo-zeile");
+        zeile.createDiv({ cls: "lesbarkeit-histo-label", text: b.label });
+        const balkenBox = zeile.createDiv("lesbarkeit-histo-balken-box");
+        const balken = balkenBox.createDiv("lesbarkeit-histo-balken");
+        balken.style.width = `${(werte[i] / maxWert) * 100}%`;
+        if (i >= 5) balken.addClass("lang");
+        else if (i >= 3) balken.addClass("mittel");
+        zeile.createDiv({ cls: "lesbarkeit-histo-wert", text: String(werte[i]) });
+      });
+
+      // Erster Satz separat — zählt in Pressetexten überproportional
+      const es = ergebnis.ersterSatz;
+      const ersterRow = satzbauSection.createDiv("lesbarkeit-metrik-row");
+      ersterRow.createDiv({ cls: "lesbarkeit-metrik-label", text: "Erster Satz" });
+      const ersterWert = ersterRow.createDiv("lesbarkeit-metrik-wert");
+      if (!es) {
+        ersterWert.setText("–");
+      } else {
+        const teile = [`${es.woerter} Wörter`];
+        if (es.nebensaetze > 0) teile.push(`${es.nebensaetze} Nebensatz${es.nebensaetze > 1 ? "-Einleiter" : ""}`);
+        if (es.passiv) teile.push("Passiv");
+        ersterWert.setText(teile.join(" · "));
+        if (es.woerter > 25 || es.passiv) ersterWert.addClass("score-schwer");
+        else if (es.woerter > 20 || es.nebensaetze > 1) ersterWert.addClass("score-mittel");
+        else ersterWert.addClass("score-gut");
+      }
     }
 
     // ── Kategorien ──
