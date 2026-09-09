@@ -131,6 +131,23 @@ test("Zwischenüberschrift beendet die Überschrift", () => {
   gleich(analysiere("# Titel\n## Zwischentitel\n\nText.").ueberschrift.text, "Titel", "Überschriftentext");
 });
 
+test("Fortsetzungszeile der Überschrift zählt nicht als Fließtext", () => {
+  const mit = analysiere("# Titel der Meldung\nund seine Fortsetzung\n\n**Teaser.**\n\nText.");
+  const ohne = analysiere("# Titel der Meldung\n\n**Teaser.**\n\nText.");
+  gleich(mit.woerter, ohne.woerter, "Wortzahl");
+});
+
+test("Erster Satz beginnt beim Teaser, nicht in der Überschrift", () => {
+  // Ohne Punkt am Ende der Überschrift hing die zweite Zeile mangels
+  // Satzzeichen am Teaser und blähte dessen Satzlänge auf.
+  const r = analysiere("# Forschende entdecken etwas\nbei der Regulierung des Wachstums\n\n**Ein Team hat es beschrieben.**\n\nText.");
+  gleich(r.ersterSatz.woerter, 5, "Wörter im ersten Satz");
+});
+
+test("Wörter aus der Überschrift lösen keine Stilmarkierung aus", () => {
+  gleich(treffer("# Titel der Meldung\nbei der Regulierung des Wachstums\n\n**Teaser.**", "nominalstil"), [], "Treffer");
+});
+
 test("H2 gilt nicht als Überschrift", () => {
   gleich(analysiere("## Zwischentitel\n\nText.").ueberschrift, null, "Überschrift");
 });

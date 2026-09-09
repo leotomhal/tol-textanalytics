@@ -535,6 +535,13 @@ function maskiereMarkdown(text) {
   return m;
 }
 
+// Einen Bereich nachträglich ausmaskieren, Zeilenumbrüche bleiben stehen,
+// damit Absatz- und Zeilenlogik unverändert greifen.
+function maskiereBereich(text, von, bis) {
+  if (!(bis > von)) return text;
+  return text.slice(0, von) + text.slice(von, bis).replace(/[^\n]/g, " ") + text.slice(bis);
+}
+
 // ─────────────────────────────────────────────
 // KATEGORIE-DEFINITION
 // ─────────────────────────────────────────────
@@ -673,8 +680,21 @@ function analysiereText(originalText) {
 
   if (!originalText || originalText.trim().length === 0) return ergebnis;
 
-  // Maskierter Text für Issue-Erkennung; Original für Anzeige-Statistiken
-  const text = maskiereMarkdown(originalText);
+  // Struktur zuerst bestimmen: Die Überschrift kann über mehrere Zeilen
+  // laufen, und alles davon muss aus der Fließtext-Analyse heraus.
+  const struktur = extrahiereUeberschriftUndTeaser(originalText);
+
+  // Maskierter Text für Issue-Erkennung; Original für Anzeige-Statistiken.
+  // maskiereMarkdown() kennt nur die "#"-Zeile selbst — Fortsetzungszeilen
+  // einer mehrzeiligen Überschrift werden hier zusätzlich ausmaskiert.
+  // Sonst hängen sie mangels Satzzeichen am folgenden Teaser und dessen
+  // Satz wird zu lang gemessen, und Wörter aus dem Titel werden als
+  // Nominalstil, Passiv oder Füllwort markiert.
+  const text = maskiereBereich(
+    maskiereMarkdown(originalText),
+    struktur.ueberschriftVon,
+    struktur.ueberschriftBis
+  );
 
   // Set zur Deduplizierung von Markierungspositionen ("von:kategorie")
   const markPositionen = new Set();
@@ -703,7 +723,6 @@ function analysiereText(originalText) {
 
   // Struktur-Check: erste H1-Überschrift + direkt folgender Teaser (fett)
   {
-    const struktur = extrahiereUeberschriftUndTeaser(originalText);
     ergebnis.ueberschrift = struktur.ueberschrift !== null
       ? { text: struktur.ueberschrift, laenge: struktur.ueberschrift.length, von: struktur.ueberschriftVon, bis: struktur.ueberschriftBis }
       : null;
