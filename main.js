@@ -94,14 +94,33 @@ function extrahiereUeberschriftUndTeaser(originalText) {
   const hm = /^#(?!#)[ \t]+(.+?)[ \t]*\r?$/m.exec(originalText);
   if (!hm) return leer;
 
-  const ueberschrift = hm[1];
-  const ueberschriftVon = originalText.indexOf(ueberschrift, hm.index);
-  const ueberschriftBis = ueberschriftVon + ueberschrift.length;
+  const ersteZeile = hm[1];
+  const ueberschriftVon = originalText.indexOf(ersteZeile, hm.index);
+  let ueberschriftBis = ueberschriftVon + ersteZeile.length;
+  let ueberschrift = ersteZeile;
   const zeilenEnde = hm.index + hm[0].length; // Ende der Überschriftzeile, vor "\n"
 
-  // Führende Leerzeilen nach der Überschrift überspringen, dann den ganzen
-  // Absatz (durchgehende nicht-leere Zeilen, auch mehrzeilig) einsammeln.
+  // Fortsetzungszeilen: Markdown kennt nur einzeilige Überschriften, in der
+  // Praxis läuft ein Titel aber über zwei Zeilen. Direkt anschließende
+  // Zeilen (ohne Leerzeile dazwischen) gehören deshalb zur Überschrift,
+  // solange sie kein eigenes Markdown-Konstrukt beginnen — ein fetter
+  // Absatz ist der Teaser, keine Fortsetzung.
   let pos = originalText[zeilenEnde] === "\n" ? zeilenEnde + 1 : zeilenEnde;
+  while (pos < originalText.length) {
+    const nlIdx = originalText.indexOf("\n", pos);
+    const aktuelleZeilenEnde = nlIdx === -1 ? originalText.length : nlIdx;
+    const zeile = originalText.slice(pos, aktuelleZeilenEnde).replace(/\r$/, "");
+    const getrimmt = zeile.trim();
+    if (getrimmt === "") break;
+    if (/^(#|>|[-*+]\s|\d+\.\s|\||`{3}|~{3}|!\[|\*\*)/.test(getrimmt)) break;
+    ueberschrift += " " + getrimmt;
+    ueberschriftBis = pos + zeile.replace(/\s+$/, "").length;
+    if (nlIdx === -1) { pos = originalText.length; break; }
+    pos = nlIdx + 1;
+  }
+
+  // Leerzeilen überspringen, dann den ganzen Absatz (durchgehende
+  // nicht-leere Zeilen, auch mehrzeilig) einsammeln.
   while (pos < originalText.length) {
     const nlIdx = originalText.indexOf("\n", pos);
     const aktuelleZeilenEnde = nlIdx === -1 ? originalText.length : nlIdx;
@@ -1206,7 +1225,24 @@ class LesbarkeitSidebarView extends ItemView {
 
     // ── Kategorien ──
     const catSection = container.createDiv("lesbarkeit-section");
-    catSection.createDiv({ cls: "lesbarkeit-section-title", text: "Kategorien (Klick = ein/aus)" });
+    const catKopf = catSection.createDiv("lesbarkeit-section-kopf");
+    catKopf.createDiv({ cls: "lesbarkeit-section-title", text: "Kategorien (Klick = ein/aus)" });
+
+    // Sammelschalter: Sind alle Prüfungen an, schaltet er sie aus — sonst an.
+    const alleAktiv = this.plugin.deaktiviert.size === 0;
+    const alleBtn = catKopf.createEl("button", {
+      cls: "lesbarkeit-alle-btn",
+      text: alleAktiv ? "Alle aus" : "Alle an",
+    });
+    alleBtn.type = "button";
+    alleBtn.addEventListener("click", () => {
+      if (alleAktiv) KATEGORIEN.forEach(k => this.plugin.deaktiviert.add(k.id));
+      else this.plugin.deaktiviert.clear();
+      this.plugin.speichereZustand();
+      this.plugin.aktualisiereAktiveView();
+      this.renderPanel(this.plugin.letzterBefund);
+    });
+
     const catList = catSection.createDiv("lesbarkeit-cat-list");
 
     for (const kat of KATEGORIEN) {

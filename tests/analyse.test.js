@@ -100,6 +100,37 @@ test("Erste H1 wird ohne '# ' gemessen", () => {
   gleich(r.ueberschrift.laenge, 12, "Überschriftenlänge");
 });
 
+test("Zweizeilige H1 wird zusammengefasst", () => {
+  const r = analysiere("# Erste Zeile\nzweite Zeile\n\nFließtext.");
+  gleich(r.ueberschrift.text, "Erste Zeile zweite Zeile", "Überschriftentext");
+  gleich(r.ueberschrift.laenge, 24, "Überschriftenlänge");
+});
+
+test("Zweizeilige H1 wird im Editor komplett markiert", () => {
+  const text = "# Erste Zeile\nzweite Zeile\n\nFließtext.";
+  const r = analysiere(text);
+  gleich(text.slice(r.ueberschrift.von, r.ueberschrift.bis), "Erste Zeile\nzweite Zeile", "markierter Bereich");
+});
+
+test("Teaser nach zweizeiliger Überschrift wird gefunden", () => {
+  const r = analysiere("# Erste Zeile\nzweite Zeile\n\n**Der Teaser.**\n\nText.");
+  gleich(r.teaser.text, "Der Teaser.", "Teasertext");
+});
+
+test("Absatz nach Leerzeile ist keine Fortsetzung der Überschrift", () => {
+  gleich(analysiere("# Titel\n\nFließtext hier.").ueberschrift.text, "Titel", "Überschriftentext");
+});
+
+test("Fetter Absatz direkt unter der H1 ist Teaser, keine Fortsetzung", () => {
+  const r = analysiere("# Titel\n**Der Teaser.**\n\nText.");
+  gleich(r.ueberschrift.text, "Titel", "Überschriftentext");
+  gleich(r.teaser.text, "Der Teaser.", "Teasertext");
+});
+
+test("Zwischenüberschrift beendet die Überschrift", () => {
+  gleich(analysiere("# Titel\n## Zwischentitel\n\nText.").ueberschrift.text, "Titel", "Überschriftentext");
+});
+
 test("H2 gilt nicht als Überschrift", () => {
   gleich(analysiere("## Zwischentitel\n\nText.").ueberschrift, null, "Überschrift");
 });
