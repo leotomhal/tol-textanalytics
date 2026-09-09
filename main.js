@@ -403,9 +403,10 @@ function analysiereErstenSatz(text) {
   if (woerter === 0) return null;
 
   const nebensatzEinleiter = /\b(dass|weil|obwohl|während|damit|wenn|falls|sobald|nachdem|bevor|indem|sofern|ob|wobei|sodass)\b/gi;
+  const spanne = trimmeSpanne(text, m.index, m.index + satz.length);
   return {
-    von: m.index,
-    bis: m.index + satz.length,
+    von: spanne.von,
+    bis: spanne.bis,
     woerter,
     kommata: (satz.match(/,/g) || []).length,
     nebensaetze: (satz.match(nebensatzEinleiter) || []).length,
@@ -525,7 +526,16 @@ function maskiereMarkdown(text) {
   // 8. HTML-Kommentare
   mask(/<!--[\s\S]*?-->/g);
 
-  // 9. Überschriften (#…######) komplett maskieren, wie Frontmatter oder
+  // 9. Hervorhebungs-Marker (**fett**, *kursiv*, __fett__, ==markiert==,
+  //    ~~gestrichen~~): Der Text dazwischen bleibt Analysetext, nur die
+  //    Marker verschwinden. Sonst hängt etwa das schließende "**" eines
+  //    Teasers am folgenden Satz, weil der Satz schon am Punkt davor endet.
+  mask(/\*+/g);
+  mask(/__/g);
+  mask(/==/g);
+  mask(/~~/g);
+
+  // 10. Überschriften (#…######) komplett maskieren, wie Frontmatter oder
   //    Codeblöcke: keine eigenständigen Sätze, folgen anderen Konventionen
   //    (oft Nominalstil, keine Verben, bewusst kurz/prägnant) — Füllwort-,
   //    Passiv- und Lange-Sätze-Prüfung sowie die Wort-/Satzstatistiken
@@ -533,6 +543,15 @@ function maskiereMarkdown(text) {
   mask(/^#{1,6}[ \t]+[^\n]*$/gm);
 
   return m;
+}
+
+// Führende und schließende Leerzeichen aus einer Fundstelle schneiden,
+// damit eine Markierung am ersten echten Zeichen beginnt und nicht auf
+// maskiertem Markup oder Zeilenumbrüchen davor.
+function trimmeSpanne(text, von, bis) {
+  while (von < bis && /\s/.test(text[von])) von++;
+  while (bis > von && /\s/.test(text[bis - 1])) bis--;
+  return { von, bis };
 }
 
 // Einen Bereich nachträglich ausmaskieren, Zeilenumbrüche bleiben stehen,
@@ -743,7 +762,8 @@ function analysiereText(originalText) {
     const wCount = (satzOhneZuschreibung.match(RE_WORT) || []).length;
     if (wCount > 25) {
       const cls = wCount > 35 ? "cm-lesbarkeit-sehr-lang-satz" : "cm-lesbarkeit-lang-satz";
-      addMark(m.index, m.index + satz.length, "lang_satz", cls, `Langer Satz: ${wCount} Wörter`);
+      const spanne = trimmeSpanne(text, m.index, m.index + satz.length);
+      addMark(spanne.von, spanne.bis, "lang_satz", cls, `Langer Satz: ${wCount} Wörter`);
     }
   }
 
@@ -832,8 +852,9 @@ function analysiereText(originalText) {
   for (const absatz of melodieErgebnis.absaetze) {
     if (absatz.stddev < MELODIE_SCHWELLE) {
       const avg = Math.round(absatz.laengen.reduce((a, b) => a + b, 0) / absatz.laengen.length);
+      const spanne = trimmeSpanne(text, absatz.von, absatz.bis);
       addMark(
-        absatz.von, absatz.bis,
+        spanne.von, spanne.bis,
         "melodie", "cm-lesbarkeit-melodie",
         `Monotone Satzlänge: Ø ${avg} Wörter, Abweichung ${absatz.stddev.toFixed(1)}`
       );

@@ -231,6 +231,21 @@ test("Zitat-Zuschreibung zählt bei der Satzlänge nicht mit", () => {
   gleich(treffer(mitZuschreibung, "lang_satz").length, 0, "Treffer trotz Zuschreibung");
 });
 
+test("Markierung beginnt am ersten Wort, nicht am Fett-Marker davor", () => {
+  // Der Satz endet am Punkt vor dem schließenden "**", das "**" gehört
+  // damit formal zum Folgesatz und darf nicht mitmarkiert werden.
+  const text = "# Titel\n\n**Ein Teaser mit Punkt.**\n\n" + "Das " + "sehr lange ".repeat(13) + "Ende.";
+  const t = treffer(text, "lang_satz");
+  gleich(t.length, 1, "Anzahl Treffer");
+  wahr(/^[A-Za-zÄÖÜäöüß]/.test(t[0]), "Markierung beginnt mit: " + JSON.stringify(t[0].slice(0, 12)));
+});
+
+test("Erster Satz enthält keine Fett-Marker", () => {
+  const text = "# Titel\n\n**Ein Teaser mit Punkt.**\n\nFließtext.";
+  const r = analysiere(text);
+  gleich(text.slice(r.ersterSatz.von, r.ersterSatz.bis), "Ein Teaser mit Punkt.", "erster Satz");
+});
+
 // ── Kennzahlen ───────────────────────────────────────────────
 test("WSTF und LIX bleiben bei sehr kurzem Text leer", () => {
   const r = analysiere("Zu kurz für eine Kennzahl.");
