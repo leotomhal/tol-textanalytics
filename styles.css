@@ -558,3 +558,15 @@
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
+
+/* Klartext-Urteil hinter dem Zahlenwert */
+.lesbarkeit-metrik-urteil {
+  opacity: 0.75;
+}
+
+.lesbarkeit-metrik-hinweis {
+  margin-top: 5px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-faint, var(--text-muted));
+}

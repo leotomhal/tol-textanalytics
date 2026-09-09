@@ -303,6 +303,13 @@ function berechneScore(zaehler, woerter, flesch, melodieScore) {
   return Math.round(0.65 * penaltyTeil + 0.15 * fleschTeil + 0.20 * melodieTeil);
 }
 
+function melodieLabel(score) {
+  if (score === null) return { label: "–", cls: "" };
+  if (score >= 60) return { label: "abwechslungsreich", cls: "score-gut" };
+  if (score >= 35) return { label: "eher gleichförmig", cls: "score-mittel" };
+  return { label: "monoton", cls: "score-schwer" };
+}
+
 function scoreLabel(score) {
   if (score === null) return { label: "–", cls: "" };
   if (score >= 70) return { label: "Sauberer Text", cls: "score-gut" };
@@ -1097,42 +1104,75 @@ class LesbarkeitSidebarView extends ItemView {
       const { label, cls } = scoreLabel(ergebnis.score);
       scoreNum.setText(String(ergebnis.score));
       scoreNum.addClass(cls);
-      const fleschTxt = ergebnis.flesch !== null ? ` · Flesch: ${ergebnis.flesch}` : "";
-      const melodieTxt = ergebnis.melodie !== null ? ` · Melodie: ${ergebnis.melodie}` : "";
-      scoreMeta.setText(label + fleschTxt + melodieTxt);
+      scoreMeta.setText(label);
     } else {
       scoreNum.setText("–");
       scoreMeta.setText("Kein Text geöffnet");
     }
 
-    // ── Verständlichkeit: WSTF (Hauptwert) + LIX (zweite Meinung) ──
+    // ── Verständlichkeit: alle Kennzahlen mit Skala und Richtung ──
+    // Nebeneinander laufen die Werte gegenläufig (Flesch: hoch = leicht,
+    // WSTF/LIX: niedrig = leicht). Ohne Skalenangabe ist keine der Zahlen
+    // für sich lesbar, deshalb steht sie hier immer mit Bereich, Klartext
+    // und Erklärung im Tooltip.
     const metrikBox = scoreSection.createDiv("lesbarkeit-metrik-box");
 
-    const wstfRow = metrikBox.createDiv("lesbarkeit-metrik-row");
-    wstfRow.createDiv({ cls: "lesbarkeit-metrik-label", text: "Wiener Sachtextformel" });
-    const wstfWert = wstfRow.createDiv("lesbarkeit-metrik-wert");
-    if (ergebnis && ergebnis.wstf !== null) {
-      const { label, cls } = wstfLabel(ergebnis.wstf);
-      wstfWert.setText(`Schulstufe ${String(ergebnis.wstf).replace(".", ",")} — ${label}`);
-      wstfWert.addClass(cls);
-      wstfRow.setAttribute(
-        "title",
-        "Ohne Fachwort-Korrektur (Frequenzliste fehlt): Bei vielen Fachbegriffen fällt die Schulstufe zu hoch aus."
-      );
-    } else {
-      wstfWert.setText("–");
-    }
+    const zeigeMetrik = (name, wertText, bewertung, erklaerung) => {
+      const row = metrikBox.createDiv("lesbarkeit-metrik-row");
+      row.createDiv({ cls: "lesbarkeit-metrik-label", text: name });
+      const wertEl = row.createDiv("lesbarkeit-metrik-wert");
+      if (wertText === null) {
+        wertEl.setText("–");
+        return;
+      }
+      wertEl.setText(wertText);
+      wertEl.addClass(bewertung.cls);
+      wertEl.createSpan({ cls: "lesbarkeit-metrik-urteil", text: ` · ${bewertung.label}` });
+      row.setAttribute("title", erklaerung);
+    };
 
-    const lixRow = metrikBox.createDiv("lesbarkeit-metrik-row");
-    lixRow.createDiv({ cls: "lesbarkeit-metrik-label", text: "LIX (zweite Meinung)" });
-    const lixWert = lixRow.createDiv("lesbarkeit-metrik-wert");
-    if (ergebnis && ergebnis.lix !== null) {
-      const { label, cls } = lixLabel(ergebnis.lix);
-      lixWert.setText(`${ergebnis.lix} — ${label}`);
-      lixWert.addClass(cls);
-    } else {
-      lixWert.setText("–");
-    }
+    const flesch = ergebnis ? ergebnis.flesch : null;
+    zeigeMetrik(
+      "Flesch-Index",
+      flesch === null ? null : `${flesch} von 100`,
+      fleschLabel(flesch),
+      "Lesbarkeit nach Flesch (deutsche Fassung). Skala 0–100, höher = leichter. "
+      + "Ab 60 gilt ein Text als gut verständlich, unter 30 als schwer."
+    );
+
+    const wstf = ergebnis ? ergebnis.wstf : null;
+    zeigeMetrik(
+      "Wiener Sachtextformel",
+      wstf === null ? null : `Schulstufe ${String(wstf).replace(".", ",")} (4–15)`,
+      wstfLabel(wstf),
+      "Geschätzte Schulstufe, die zum Verstehen nötig ist. Skala 4–15, niedriger = leichter. "
+      + "Pressetexte für ein allgemeines Publikum liegen etwa bei 8–11. Ohne Fachwort-Korrektur "
+      + "(Frequenzliste fehlt): Bei vielen Fachbegriffen fällt der Wert zu hoch aus."
+    );
+
+    const lix = ergebnis ? ergebnis.lix : null;
+    zeigeMetrik(
+      "Lesbarkeitsindex LIX",
+      lix === null ? null : `${lix} (Skala ca. 20–70)`,
+      lixLabel(lix),
+      "Satzlänge plus Anteil langer Wörter, niedriger = leichter. Unter 40 leicht (Belletristik), "
+      + "40–50 mittel (Sachtext), 50–60 schwer (Fachtext), über 60 sehr schwer (Behördendeutsch). "
+      + "Läuft als zweite Meinung neben der Wiener Formel."
+    );
+
+    const melodie = ergebnis ? ergebnis.melodie : null;
+    zeigeMetrik(
+      "Sprachmelodie",
+      melodie === null ? null : `${melodie} von 100`,
+      melodieLabel(melodie),
+      "Wie stark die Satzlängen innerhalb der Absätze variieren. Skala 0–100, höher = "
+      + "abwechslungsreicher. Niedrige Werte heißen: viele Sätze gleicher Länge hintereinander."
+    );
+
+    metrikBox.createDiv({
+      cls: "lesbarkeit-metrik-hinweis",
+      text: "Flesch und Sprachmelodie: höher ist besser. Wiener Formel und LIX: niedriger ist leichter.",
+    });
 
     // ── Statistiken ──
     const statsSection = container.createDiv("lesbarkeit-section");
