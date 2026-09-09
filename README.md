@@ -49,6 +49,40 @@ Der Test kompiliert `main.js` mit einem Stub für das `obsidian`-Modul und
 prüft `analysiereText()` gegen Beispieltexte. Exit-Code 1 bei Fehlern.
 Vor jeder Änderung an der Engine laufen lassen.
 
+## Wortschatz-Listen
+
+Die Prüfung auf seltene Wörter und die Fachwort-Korrektur der Wiener
+Sachtextformel brauchen zwei Häufigkeitslisten im Plugin-Ordner. Beide
+erzeugt `tools/frequenzliste.js`, beide sind optional — fehlen sie, ruht
+nur diese eine Prüfung.
+
+**`frequenz-allgemein.json`** — allgemeinsprachliches Korpus. Was hier
+fehlt, gilt für die Leserschaft als Fachbegriff. Eine fertige, frei
+lizenzierte Häufigkeitsliste (Format `wort anzahl` pro Zeile) umwandeln:
+
+```
+node tools/frequenzliste.js --konvertiere de_full.txt --out frequenz-allgemein.json
+```
+
+**`frequenz-eigene.json`** — das eigene Pressemeldungs-Archiv. Was hier
+häufig vorkommt, ist Hausvokabular und wird nicht bei jeder Meldung neu
+angemahnt (für die Fachwort-Korrektur zählt es trotzdem, denn der Leser
+kennt ein Wort nicht, nur weil es in jeder Meldung steht):
+
+```
+node tools/frequenzliste.js /pfad/zum/archiv --out frequenz-eigene.json
+```
+
+Optionen: `--min` (Mindesthäufigkeit, Standard 3 — filtert Tippfehler und
+einzeln auftauchende Personennamen heraus), `--top` (Anzahl behaltener
+Wörter, Standard 8000), `--quelle` (Notiz für die Metadaten). Die
+Bereinigung und Wortzerlegung kommen aus `main.js` selbst, damit das
+Korpus genauso tokenisiert wird wie die Texte im Editor.
+
+Ein eigenes Archiv als *alleinige* Grundlage taugt übrigens nicht: Es misst
+"ungewöhnlich für mich" statt "schwer für den Leser" — die eigenen
+Standard-Fachbegriffe fielen dann nie auf. Deshalb die zweite Liste.
+
 ## Funktionsumfang
 
 - Aktivierung nur bei Notizen mit `typ: draft` im Frontmatter.
@@ -67,6 +101,9 @@ Vor jeder Änderung an der Engine laufen lassen.
   Satzes, Wörter/Zeichen/Sätze/Lesezeit, Kategorien-Zähler mit Klick zum
   Ein-/Ausblenden) und Issues (Liste aller Fundstellen mit
   Kontext-Snippet, Klick springt zur Stelle im Editor).
+- Wortschatz: seltene Wörter als eigene Kategorie und die Wiener
+  Sachtextformel zusätzlich ohne Fachbegriffe gerechnet — beides nur, wenn
+  die Häufigkeitslisten vorliegen (siehe oben).
 - Einstellungen (Zielzeichenzahlen, abgeschaltete Kategorien) werden im
   Vault gespeichert und überleben einen Neustart.
 - Tooltip beim Hover über eine Markierung im Editor.

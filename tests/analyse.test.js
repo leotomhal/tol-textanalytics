@@ -66,10 +66,18 @@ function wahr(bedingung, was) {
 }
 
 // Treffer einer Kategorie als Textausschnitte
-function treffer(text, kategorie) {
-  return analysiere(text).markierungen
+function treffer(text, kategorie, frequenz) {
+  return analysiere(text, frequenz).markierungen
     .filter(m => m.kategorie === kategorie)
     .map(m => text.slice(m.von, m.bis));
+}
+
+// Häufigkeitslisten, wie das Plugin sie aus den JSON-Dateien baut
+function listen(allgemein, eigene) {
+  return {
+    allgemein: allgemein ? new Set(allgemein) : null,
+    eigene: eigene ? new Set(eigene) : null,
+  };
 }
 
 // ── Basiszählung ─────────────────────────────────────────────
@@ -300,6 +308,55 @@ test("Füllwort mit Umlaut am Wortanfang wird erkannt", () => {
 
 test("Passiv im ersten Satz wird erkannt", () => {
   gleich(analysiere("Die Studie wurde veröffentlicht. Danach kam nichts.").ersterSatz.passiv, true, "Passiv");
+});
+
+// ── Wortschatz (Konzept 3.5) ─────────────────────────────────
+const ALLGEMEIN = ["die", "das", "team", "hat", "im", "labor", "neue", "proben", "und", "wurden", "geprüft"];
+
+test("Ohne Häufigkeitsliste ruht die Wortschatz-Prüfung", () => {
+  gleich(treffer("Die Phosphorylierung wurde gemessen.", "seltenes_wort"), [], "Treffer");
+  gleich(analysiere("Die Phosphorylierung wurde gemessen.").wstfKorrigiert, null, "korrigierte WSTF");
+});
+
+test("Wort außerhalb des Allgemeinwortschatzes wird markiert", () => {
+  gleich(
+    treffer("Das Team hat neue Proben im Labor geprüft und die Phosphorylierung gemessen.",
+      "seltenes_wort", listen(ALLGEMEIN)),
+    ["Phosphorylierung", "gemessen"],
+    "Treffer"
+  );
+});
+
+test("Hausvokabular aus dem eigenen Archiv wird nicht gemeldet", () => {
+  const t = treffer("Das Team hat neue Proben im Labor geprüft und die Phosphorylierung gemessen.",
+    "seltenes_wort", listen(ALLGEMEIN, ["phosphorylierung", "gemessen"]));
+  gleich(t, [], "Treffer");
+});
+
+test("Kurze Wörter und Stoppwörter lösen nichts aus", () => {
+  // "ist" und "wir" fehlen in der Testliste, sind aber zu kurz beziehungs-
+  // weise Hilfsverb/Pronomen — sie dürfen nicht als selten gelten.
+  gleich(treffer("Das Team ist im Labor und wir sind da.", "seltenes_wort", listen(ALLGEMEIN)), [], "Treffer");
+});
+
+test("Fachwort-Korrektur senkt die Schulstufe und zählt die Begriffe", () => {
+  const text = "Das Team hat im Labor die Phosphorylierung und die Kryokonservierung geprüft. "
+    + "Das Team hat im Labor die Transkriptomanalyse und die Enzymkinetik geprüft. "
+    + "Das Team hat im Labor neue Proben geprüft und die Ergebnisse geprüft.";
+  const r = analysiere(text, listen(ALLGEMEIN));
+  wahr(r.wstfKorrigiert !== null, "keine korrigierte WSTF berechnet");
+  wahr(r.wstfKorrigiert < r.wstf, `korrigiert (${r.wstfKorrigiert}) nicht kleiner als roh (${r.wstf})`);
+  wahr(r.fachbegriffe > 0, "keine Fachbegriffe gezählt");
+});
+
+test("Hausvokabular zählt für die Fachwort-Korrektur trotzdem mit", () => {
+  // Der Leser kennt ein Wort nicht, nur weil es in jeder Meldung steht.
+  const text = "Das Team hat im Labor die Phosphorylierung geprüft und die Phosphorylierung gemessen. "
+    + "Das Team hat im Labor neue Proben geprüft und die Proben geprüft.";
+  const ohne = analysiere(text, listen(ALLGEMEIN));
+  const mit = analysiere(text, listen(ALLGEMEIN, ["phosphorylierung"]));
+  gleich(mit.wstfKorrigiert, ohne.wstfKorrigiert, "korrigierte WSTF");
+  gleich(mit.fachbegriffe, ohne.fachbegriffe, "Anzahl Fachbegriffe");
 });
 
 // ── Ergebnis ─────────────────────────────────────────────────

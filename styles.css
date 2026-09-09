@@ -570,3 +570,14 @@
   line-height: 1.4;
   color: var(--text-faint, var(--text-muted));
 }
+
+.lesbarkeit-metrik-zusatz {
+  margin: -1px 0 4px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.lesbarkeit-mehrzeilig {
+  white-space: pre-line;
+}

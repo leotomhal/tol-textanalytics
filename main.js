@@ -327,19 +327,48 @@ function scoreLabel(score) {
 // fachwortdichten Texten fällt die Schulstufe deshalb systematisch zu hoch
 // aus — drei der vier Terme messen Wortlänge, nicht Satzbau.
 // ─────────────────────────────────────────────
-function berechneWstf(text) {
-  const saetze = text.split(/[.!?…:]+/).filter(s => (s.match(RE_WORT) || []).length > 0);
-  const woerter = text.match(RE_WORT) || [];
-  if (saetze.length === 0 || woerter.length < 20) return null;
-
+function wstfWert(woerter, sl) {
+  if (woerter.length === 0) return null;
   const silben = woerter.map(zaehleSilben);
   const ms = silben.filter(s => s >= 3).length / woerter.length * 100;
   const es = silben.filter(s => s === 1).length / woerter.length * 100;
   const iw = woerter.filter(w => w.length > 6).length / woerter.length * 100;
-  const sl = woerter.length / saetze.length;
 
   const stufe = 0.1935 * ms + 0.1672 * sl + 0.1297 * iw - 0.0327 * es - 0.875;
   return Math.round(Math.max(4, Math.min(15, stufe)) * 10) / 10;
+}
+
+function wstfGrundlage(text) {
+  const saetze = text.split(/[.!?…:]+/).filter(s => (s.match(RE_WORT) || []).length > 0);
+  const woerter = text.match(RE_WORT) || [];
+  if (saetze.length === 0 || woerter.length < 20) return null;
+  return { woerter, sl: woerter.length / saetze.length };
+}
+
+function berechneWstf(text) {
+  const g = wstfGrundlage(text);
+  return g ? wstfWert(g.woerter, g.sl) : null;
+}
+
+// Fachwort-Korrektur (Konzept 3.2): Fachbegriffe fliegen vollständig aus
+// MS, IW und ES heraus, die Satzlänge SL bleibt unverändert — die Wörter
+// stehen ja weiter im Satz. Die Differenz zum Rohwert ist die eigentliche
+// Information: klein = die Komplexität sitzt im Satzbau und ist behebbar,
+// groß = sie sitzt im Vokabular.
+function berechneWstfKorrigiert(text, istFachbegriff) {
+  if (!istFachbegriff) return null;
+  const g = wstfGrundlage(text);
+  if (!g) return null;
+  const ohne = g.woerter.filter(w => !istFachbegriff(w));
+  // Niedrigere Schwelle als bei der Rohrechnung (20): Je fachwortdichter
+  // ein Text, desto weniger bleibt übrig — und desto interessanter ist
+  // gerade dieser zweite Wert. Unter 10 Wörtern wird die Silbenverteilung
+  // allerdings zu Rauschen.
+  if (ohne.length < 10 || ohne.length === g.woerter.length) return null;
+  const fachbegriffe = new Set(
+    g.woerter.filter(w => istFachbegriff(w)).map(w => w.toLowerCase())
+  );
+  return { stufe: wstfWert(ohne, g.sl), fachbegriffe: fachbegriffe.size };
 }
 
 function wstfLabel(stufe) {
@@ -367,6 +396,43 @@ function lixLabel(lix) {
   if (lix < 50) return { label: "mittel", cls: "score-gut" };
   if (lix < 60) return { label: "schwer", cls: "score-mittel" };
   return { label: "sehr schwer", cls: "score-schwer" };
+}
+
+// ─────────────────────────────────────────────
+// WORTSCHATZ (Konzept 3.5)
+// Zwei Listen, erzeugt mit tools/frequenzliste.js:
+//   allgemein — allgemeinsprachliches Korpus. Was hier fehlt, ist für die
+//               Leserschaft ein Fachbegriff.
+//   eigene    — das eigene Pressemeldungs-Archiv. Was hier häufig vorkommt,
+//               ist Hausvokabular und wird nicht bei jeder Meldung neu
+//               angemahnt; für die WSTF-Korrektur zählt es trotzdem als
+//               Fachbegriff, denn der Leser kennt es deswegen nicht.
+// Fehlt die allgemeine Liste, ruht die ganze Prüfung.
+// ─────────────────────────────────────────────
+function baueWortschatz(frequenz) {
+  const allgemein = frequenz && frequenz.allgemein instanceof Set ? frequenz.allgemein : null;
+  const eigene = frequenz && frequenz.eigene instanceof Set ? frequenz.eigene : null;
+  if (!allgemein || allgemein.size === 0) return null;
+
+  const istFachbegriff = (wort) => {
+    const klein = wort.toLowerCase();
+    if (klein.length < WIEDERHOLUNG_MIN_WORTLAENGE) return false;
+    if (/^\d+$/.test(klein)) return false;
+    return !allgemein.has(klein);
+  };
+
+  return {
+    istFachbegriff,
+    // Markiert wird nur, was auch im eigenen Archiv selten ist.
+    istMeldenswert: (wort) => {
+      const klein = wort.toLowerCase();
+      if (!istFachbegriff(klein)) return false;
+      if (STOPWOERTER_WIEDERHOLUNG.has(klein)) return false;
+      if (FUELLWOERTER.includes(klein)) return false;
+      if (EIGENNAMEN_AUSNAHMEN_WIEDERHOLUNG.has(klein)) return false;
+      return !(eigene && eigene.has(klein));
+    },
+  };
 }
 
 // ─────────────────────────────────────────────
@@ -573,6 +639,7 @@ const KATEGORIEN = [
   { id: "nominalstil",   label: "Nominalstil",            farbe: "#9C27B0", cls: "cm-lesbarkeit-nominal" },
   { id: "perfekt",       label: "Perfekt",                farbe: "#00897B", cls: "cm-lesbarkeit-perfekt" },
   { id: "abkuerzung",    label: "Abkürzungen",            farbe: "#795548", cls: "cm-lesbarkeit-abk" },
+  { id: "seltenes_wort", label: "Seltene Wörter",         farbe: "#FF5722", cls: "cm-lesbarkeit-fremd" },
 ];
 
 // ─────────────────────────────────────────────
@@ -647,6 +714,22 @@ class LesbarkeitSettingTab extends PluginSettingTab {
     }
 
     containerEl.createEl("hr", { cls: "lesbarkeit-settings-divider" });
+    containerEl.createEl("h3", { text: "Wortschatz-Listen" });
+    const f = this.plugin.frequenz || {};
+    const zustand = (liste, name, zweck) => name + ": "
+      + (liste ? `${liste.size.toLocaleString("de")} Wörter geladen` : "nicht gefunden")
+      + ` — ${zweck}`;
+    containerEl.createEl("p", {
+      text: zustand(f.allgemein, "frequenz-allgemein.json", "Basis; fehlt sie, ruht die Prüfung auf seltene Wörter komplett")
+        + "\n" + zustand(f.eigene, "frequenz-eigene.json", "eigenes Archiv; verhindert Meldungen zu deinem Hausvokabular"),
+      cls: "setting-item-description lesbarkeit-mehrzeilig",
+    });
+    containerEl.createEl("p", {
+      text: "Beide Dateien werden mit tools/frequenzliste.js erzeugt und in den Plugin-Ordner gelegt. Nach dem Austausch Obsidian neu laden.",
+      cls: "setting-item-description",
+    });
+
+    containerEl.createEl("hr", { cls: "lesbarkeit-settings-divider" });
     containerEl.createEl("p", {
       text: `Feste Grenzwerte: H1-Überschrift grün bis ${UEBERSCHRIFT_WARN_ZEICHEN}, gelb bis ${UEBERSCHRIFT_MAX_ZEICHEN} Zeichen. Lange Sätze ab 25 Wörtern, sehr lange ab 35.`,
       cls: "setting-item-description"
@@ -678,7 +761,7 @@ const ZITAT_ZUSCHREIBUNG_REGEX =
 // ─────────────────────────────────────────────
 // ANALYSE-ENGINE
 // ─────────────────────────────────────────────
-function analysiereText(originalText) {
+function analysiereText(originalText, frequenz) {
   const ergebnis = {
     markierungen: [],
     zaehler: {},
@@ -690,6 +773,8 @@ function analysiereText(originalText) {
     melodie: null,
     score: null,
     wstf: null,
+    wstfKorrigiert: null,
+    fachbegriffe: 0,
     lix: null,
     satzbau: null,
     ersterSatz: null,
@@ -737,6 +822,15 @@ function analysiereText(originalText) {
   ergebnis.flesch = berechneFlesch(text);
   ergebnis.wstf = berechneWstf(text);
   ergebnis.lix = berechneLix(text);
+
+  const wortschatz = baueWortschatz(frequenz);
+  if (wortschatz) {
+    const korrigiert = berechneWstfKorrigiert(text, wortschatz.istFachbegriff);
+    if (korrigiert) {
+      ergebnis.wstfKorrigiert = korrigiert.stufe;
+      ergebnis.fachbegriffe = korrigiert.fachbegriffe;
+    }
+  }
   ergebnis.satzbau = berechneSatzbau(text);
   ergebnis.ersterSatz = analysiereErstenSatz(text);
 
@@ -946,6 +1040,20 @@ function analysiereText(originalText) {
         ab.index, ab.index + abk.length,
         "abkuerzung", "cm-lesbarkeit-abk",
         `Abkürzung „${abk}" wird beim ersten Auftreten nicht aufgelöst`
+      );
+    }
+  }
+
+  // ── 9. Seltene Wörter (Konzept 3.5) ──
+  if (wortschatz) {
+    reset(RE_WORT);
+    let sw;
+    while ((sw = RE_WORT.exec(text)) !== null) {
+      if (!wortschatz.istMeldenswert(sw[0])) continue;
+      addMark(
+        sw.index, sw.index + sw[0].length,
+        "seltenes_wort", "cm-lesbarkeit-fremd",
+        `Seltenes Wort: „${sw[0]}" — kommt weder im Allgemeinwortschatz noch in deinen Meldungen häufig vor`
       );
     }
   }
@@ -1189,6 +1297,17 @@ class LesbarkeitSidebarView extends ItemView {
       + "Pressetexte für ein allgemeines Publikum liegen etwa bei 8–11. Ohne Fachwort-Korrektur "
       + "(Frequenzliste fehlt): Bei vielen Fachbegriffen fällt der Wert zu hoch aus."
     );
+
+    if (ergebnis && ergebnis.wstfKorrigiert !== null) {
+      const roh = ergebnis.wstf;
+      const korr = ergebnis.wstfKorrigiert;
+      metrikBox.createDiv({
+        cls: "lesbarkeit-metrik-zusatz",
+        text: `ohne ${ergebnis.fachbegriffe} Fachbegriffe: Schulstufe `
+          + `${String(korr).replace(".", ",")}`
+          + (roh !== null ? ` (${(roh - korr) >= 2 ? "Komplexität steckt im Vokabular" : "Komplexität steckt im Satzbau"})` : ""),
+      });
+    }
 
     const lix = ergebnis ? ergebnis.lix : null;
     zeigeMetrik(
@@ -1451,7 +1570,7 @@ function baueExtension(plugin) {
         }
 
         const text = view.state.doc.toString();
-        const ergebnis = analysiereText(text);
+        const ergebnis = analysiereText(text, plugin.frequenz);
         plugin.letzterBefund = ergebnis;
         plugin.letzterText = text;
         plugin.aktualisierePanel();
@@ -1560,8 +1679,10 @@ class LesbarkeitPlugin extends Plugin {
     this.letzterBefund = null;
     this.tooltipEl = null;
     this.aktiveDatei = null;
+    this.frequenz = { allgemein: null, eigene: null };
 
     await this.loadSettings();
+    await this.ladeFrequenzlisten();
     this.addSettingTab(new LesbarkeitSettingTab(this.app, this));
 
     this.registerView(SIDEBAR_VIEW_TYPE, (leaf) => new LesbarkeitSidebarView(leaf, this));
@@ -1612,6 +1733,30 @@ class LesbarkeitPlugin extends Plugin {
   onunload() {
     this.app.workspace.detachLeavesOfType(SIDEBAR_VIEW_TYPE);
     this.versteckeTooltip();
+  }
+
+  // Worthäufigkeitslisten aus dem Plugin-Ordner lesen (erzeugt mit
+  // tools/frequenzliste.js). Fehlen sie, ruht die Wortschatz-Prüfung
+  // stillschweigend — das Plugin bleibt ohne sie voll funktionsfähig.
+  async ladeFrequenzlisten() {
+    this.frequenz = {
+      allgemein: await this.ladeFrequenzliste("frequenz-allgemein.json"),
+      eigene: await this.ladeFrequenzliste("frequenz-eigene.json"),
+    };
+  }
+
+  async ladeFrequenzliste(dateiname) {
+    try {
+      const pfad = `${this.manifest.dir}/${dateiname}`;
+      if (!(await this.app.vault.adapter.exists(pfad))) return null;
+      const inhalt = JSON.parse(await this.app.vault.adapter.read(pfad));
+      const woerter = inhalt && inhalt.woerter;
+      if (!woerter) return null;
+      return new Set(Object.keys(woerter));
+    } catch (e) {
+      console.error(`TOL Textanalyse: ${dateiname} konnte nicht gelesen werden.`, e);
+      return null;
+    }
   }
 
   async loadSettings() {
